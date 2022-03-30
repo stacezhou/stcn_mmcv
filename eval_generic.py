@@ -43,6 +43,7 @@ from util.tensor_util import unpad
 from inference_core_yv import InferenceCore
 
 from progressbar import progressbar
+from tqdm import tqdm
 
 """
 Arguments loading
@@ -83,7 +84,7 @@ for k in list(prop_saved.keys()):
 prop_model.load_state_dict(prop_saved)
 
 # Start eval
-for data in progressbar(test_loader, max_value=len(test_loader), redirect_stdout=True):
+for data in test_loader:
 
     with torch.cuda.amp.autocast(enabled=args.amp):
         rgb = data['rgb']
@@ -105,7 +106,7 @@ for data in progressbar(test_loader, max_value=len(test_loader), redirect_stdout
         # min_idx tells us the starting point of propagation
         # Propagating before there are labels is not useful
         min_idx = 99999
-        for i, frame_idx in enumerate(frames_with_gt):
+        for i, frame_idx in tqdm(enumerate(frames_with_gt)):
             min_idx = min(frame_idx, min_idx)
             # Note that there might be more than one label per frame
             obj_idx = gt_obj[frame_idx][0].tolist()
