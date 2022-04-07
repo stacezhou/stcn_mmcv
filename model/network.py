@@ -59,14 +59,16 @@ class MemoryReader(nn.Module):
 
         return affinity
 
-    def readout(self, affinity, mv, qv):
+    def readout(self, affinity, mv, qv=None):
         B, CV, T, H, W = mv.shape
 
         mo = mv.view(B, CV, T*H*W) 
         mem = torch.bmm(mo, affinity) # Weighted-sum B, CV, HW
         mem = mem.view(B, CV, H, W)
-
-        mem_out = torch.cat([mem, qv], dim=1)
+        if qv is None:
+            mem_out = mem
+        else:
+            mem_out = torch.cat([mem, qv], dim=1)
 
         return mem_out
 
@@ -125,6 +127,29 @@ class STCN(nn.Module):
         else:
             f16 = self.value_encoder(frame, kf16, mask, other_mask)
         return f16.unsqueeze(2) # B*512*T*H*W
+    
+    def get_mask(self, frame, kf16, mask, other_mask=None): 
+        B,C,H,W = mask.shape
+        return mask.reshape((B,1,C,H,W))
+
+    def segment_lr_mask(self, qk16, qv16, qf8, qf4, mk16, mm16, selector=None): 
+        affinity = self.memory.get_affinity(mk16, qk16)
+        if self.single_object:
+            logits = self.memory.readout(affinity, mm16) # without decoder
+            prob = torch.sigmoid(logits)
+        else:
+            logits = torch.cat([
+                self.memory.readout(affinity, mm16[:,0]), # without decoder
+                self.memory.readout(affinity, mm16[:,1])  # without decoder
+            ], 1)
+
+            prob = torch.sigmoid(logits)
+            prob = prob * selector.unsqueeze(2).unsqueeze(2)
+
+        logits = self.aggregate(prob)
+        prob = F.softmax(logits, dim=1)[:, 1:]
+
+        return logits, prob
 
     def segment(self, qk16, qv16, qf8, qf4, mk16, mv16, selector=None): 
         # q - query, m - memory
@@ -155,7 +180,9 @@ class STCN(nn.Module):
             return self.encode_value(*args, **kwargs)
         elif mode == 'segment':
             return self.segment(*args, **kwargs)
+        elif mode == 'get_mask':
+            return self.get_mask(*args, **kwargs)
+        elif mode == 'segment_lr_mask':
+            return self.segment_lr_mask(*args, **kwargs)
         else:
             raise NotImplementedError
-
-
