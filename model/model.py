@@ -69,12 +69,15 @@ class STCNModel:
             Ms = data['gt']
             B,T,C,H,W = Ms.shape
             Ms = Ms.reshape((B,T,C,H // 16,16,W // 16,16)).mean((4,6))
+            Ms = torch.where(Ms > 1/16, 
+                            0.5*(1+(Ms-1/16)/(1-1/16)), 
+                            0.5*(1-(1/16-Ms)*16))
             data['gt'] = Ms
 
             Ms = data['cls_gt']
             B,T,H,W = Ms.shape
-            Ms = Ms.reshape((B,T,H // 16,16,W // 16,16)).float().mean((3,5))
-            Ms=torch.where(Ms>0.3,torch.ones_like(Ms),torch.zeros_like(Ms))
+            Ms = Ms.reshape((B,T,H // 16,16,W // 16,16)).sum((3,5))
+            Ms=torch.where(Ms>16,torch.ones_like(Ms),torch.zeros_like(Ms))
             data['cls_gt'] = Ms.long()
         else:
             segment = 'segment'
