@@ -74,7 +74,7 @@ class STCNModel:
             Ms = data['cls_gt']
             B,T,H,W = Ms.shape
             Ms = Ms.reshape((B,T,H // 16,16,W // 16,16)).float().mean((3,5))
-            # Ms=torch.where(Ms>0.3,torch.ones_like(Ms),torch.zeros_like(Ms))
+            Ms=torch.where(Ms>0.3,torch.ones_like(Ms),torch.zeros_like(Ms))
             data['cls_gt'] = Ms.long()
         else:
             segment = 'segment'
