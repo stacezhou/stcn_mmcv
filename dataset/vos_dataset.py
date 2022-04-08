@@ -22,7 +22,7 @@ class VOSDataset(Dataset):
     - Apply random transform to each of the frame
     - The distance between frames is controlled
     """
-    def __init__(self, im_root, gt_root, max_jump, is_bl, subset=None):
+    def __init__(self, im_root, gt_root, max_jump, is_bl, subset=None, val=False):
         self.im_root = im_root
         self.gt_root = gt_root
         self.max_jump = max_jump
@@ -35,8 +35,12 @@ class VOSDataset(Dataset):
         # Pre-filtering
         for vid in vid_list:
             if subset is not None:
-                if vid not in subset:
-                    continue
+                if val:
+                    if vid in subset:
+                        continue
+                else:
+                    if vid not in subset:
+                        continue
             frames = sorted(os.listdir(os.path.join(self.im_root, vid)))
             if len(frames) < 3:
                 continue
