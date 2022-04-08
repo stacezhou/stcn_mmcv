@@ -64,21 +64,29 @@ class STCNModel:
 
         out = {}
         if self.low_resolution_mask:
+            def down_sample(Ms):
+                *dims,H,W = Ms.shape
+                Ms = Ms.reshape((*dims,H//16,16,W//16,16)).float().mean((-1,-3))
+                thr = 1/2
+                Ms = torch.where(Ms > thr, 
+                                0.5*(1+(Ms-thr)/(1-thr)), 
+                                0.5*(1-(thr-Ms)/thr))
+                return Ms
+            
+            def down_cls_gt(Ms):
+                *dims,H,W = Ms.shape
+                Ms = Ms.reshape((*dims,H//16,16,W//16,16)).swapaxes(-2,-3)
+                Ms = Ms.reshape((*dims,H//16,W//16,-1))
+                Ms = torch.mode(Ms)[0]
+                return Ms
+
+
+            data['gt'] = down_sample(data['gt'])
+            data['sec_gt'] = down_sample(data['sec_gt'])
+            data['cls_gt'] = down_cls_gt(data['cls_gt'])
+
             segment = 'segment_lr_mask'
             encode_value = 'get_mask'
-            Ms = data['gt']
-            B,T,C,H,W = Ms.shape
-            Ms = Ms.reshape((B,T,C,H // 16,16,W // 16,16)).mean((4,6))
-            Ms = torch.where(Ms > 1/16, 
-                            0.5*(1+(Ms-1/16)/(1-1/16)), 
-                            0.5*(1-(1/16-Ms)*16))
-            data['gt'] = Ms
-
-            Ms = data['cls_gt']
-            B,T,H,W = Ms.shape
-            Ms = Ms.reshape((B,T,H // 16,16,W // 16,16)).sum((3,5))
-            Ms=torch.where(Ms>16,torch.ones_like(Ms),torch.zeros_like(Ms))
-            data['cls_gt'] = Ms.long()
         else:
             segment = 'segment'
             encode_value = 'encode_value'
