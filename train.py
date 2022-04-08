@@ -102,6 +102,15 @@ def renew_vos_loader(max_skip):
 
     return construct_loader(train_dataset)
 
+def get_vos_eval_loader(max_skip):
+    yv_dataset = VOSDataset(path.join(yv_root, 'JPEGImages'), 
+                        path.join(yv_root, 'Annotations'), max_skip//5, is_bl=False,val=True, subset=load_sub_yv())
+    davis_dataset = VOSDataset(path.join(davis_root, 'JPEGImages', '480p'), 
+                        path.join(davis_root, 'Annotations', '480p'), max_skip, is_bl=False,val=True, subset=load_sub_davis())
+    eval_dataset = ConcatDataset([davis_dataset] + [yv_dataset])
+
+    return construct_loader(eval_dataset)[1]
+
 def renew_bl_loader(max_skip):
     train_dataset = VOSDataset(path.join(bl_root, 'JPEGImages'), 
                         path.join(bl_root, 'Annotations'), max_skip, is_bl=True)
@@ -173,7 +182,7 @@ Starts training
 np.random.seed(np.random.randint(2**30-1) + local_rank*100)
 try:
     for e in range(current_epoch, total_epoch): 
-        print('Epoch %d/%d' % (e, total_epoch))
+        # print('Epoch %d/%d' % (e, total_epoch))
         if para['stage']!=0 and e!=total_epoch and e>=increase_skip_epoch[0]:
             while e >= increase_skip_epoch[0]:
                 cur_skip = skip_values[0]
@@ -193,6 +202,7 @@ try:
 
             if total_iter >= para['iterations']:
                 break
+                
 finally:
     if not para['debug'] and model.logger is not None and total_iter>5000:
         model.save(total_iter)
