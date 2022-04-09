@@ -12,6 +12,12 @@ def get_iou_hook(values):
 def get_sec_iou_hook(values):
     return 'iou/sec_iou', (values['hide_iou/sec_i']+1)/(values['hide_iou/sec_u']+1)
 
+def get_iou_mask_hook(values):
+    return 'iou/iou_mask', (values['hide_iou/i_mask']+1)/(values['hide_iou/u_mask']+1)
+
+def get_sec_iou_mask_hook(values):
+    return 'iou/sec_iou_mask', (values['hide_iou/sec_i_mask']+1)/(values['hide_iou/sec_u_mask']+1)
+
 iou_hooks_so = [
     get_iou_hook,
 ]
@@ -19,6 +25,8 @@ iou_hooks_so = [
 iou_hooks_mo = [
     get_iou_hook,
     get_sec_iou_hook,
+    get_iou_mask_hook,
+    get_sec_iou_mask_hook
 ]
 
 
