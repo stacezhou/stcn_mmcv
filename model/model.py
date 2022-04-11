@@ -75,7 +75,8 @@ class STCNModel:
         if self.low_resolution_mask:
             lr_data = data.copy()
             lr_data['gt'] = down_sample(lr_data['gt'])
-            lr_data['sec_gt'] = down_sample(lr_data['sec_gt'])
+            if not self.single_object:
+                lr_data['sec_gt'] = down_sample(lr_data['sec_gt'])
             lr_data['cls_gt'] = down_cls_gt(lr_data['cls_gt'])
 
         torch.set_grad_enabled(self._is_train)
