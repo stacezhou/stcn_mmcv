@@ -103,6 +103,8 @@ class STCN(nn.Module):
 
     def encode_key(self, frame): 
         # input: b*t*c*h*w
+        if len(frame.shape) == 4:
+            frame.unsqueeze(1)
         b, t = frame.shape[:2]
 
         f16, f8, f4 = self.key_encoder(frame.flatten(start_dim=0, end_dim=1))
