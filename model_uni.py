@@ -87,9 +87,16 @@ class STCNModel(nn.Module):
         ii = self.broadcast_map # broadcast B,C,H,W to N,C,H,W ,from B frames to N objects
         obj_mask_value = torch.cat([obj_read_values, kf16_thin[ii]],dim=1)
         logits = self.mask_decoder(obj_mask_value,kf8[ii],kf4[ii]).squeeze(1)
-        prob_ = torch.sigmoid(logits).clamp(1e-7, 1-1e-7)
-        logits = torch.log(prob_ / (1 - prob_))
-        prob = torch.empty_like(prob_)
+        prob_ = torch.sigmoid(logits)
+        new_prob = torch.zeros_like(prob_)
+        for obj_per_frame in self.aggregate_map:
+            bg,*objs = obj_per_frame
+            new_prob[objs] = prob_[objs]
+            new_prob[bg] = torch.prod(1-new_prob[objs],dim=0,keepdim=False).clamp(1e-7, 1-1e-7)
+
+
+        logits = torch.log(new_prob / (1 - new_prob))
+        prob = torch.empty_like(new_prob)
         for obj_per_frame in self.aggregate_map:
             prob[obj_per_frame] = F.log_softmax(logits[obj_per_frame],dim=0)
 
