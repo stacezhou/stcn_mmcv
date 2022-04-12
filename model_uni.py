@@ -3,113 +3,154 @@ import torch.nn.functional as F
 import math
 from model.network import STCN
 from model.losses import LossComputer
-from model.modules import ValueEncoder
+from model.modules import ValueEncoder,ValueEncoderSO
+
+
+
 
 class STCNModel(STCN):
 
     def __init__(self):
-        super().__init__(single_object=False)
-        self.value_encoder = ValueEncoder()
-        self.loss = None
+        super().__init__(single_object=True)
+        self.value_encoder = ValueEncoderSO()
         # self.loss_fn = LossComputer()
         self.MAX_NUM_MEMORY = 5
-        self.C = 128 # value embedding dimension
     
-    def reset_memory(self,mask):
-        self.K = len(mask.unique()) # num_objects
-        self.num_frames = 0
-        B,N,H,W = mask.shape
-        h,w = H//16,W//16
-        T = self.MAX_NUM_MEMORY
-        self.mem_keys = torch.zeros((B,T,H,W))
-        self.mem_value = torch.zeros((B,T,self.C,h,w))
-        self.mem_masks = torch.zeros((B,T,N,H,W))
-    
+    def init_obj(self,cls_gt):
+        B,H,W = cls_gt.shape
+        obj_labels = [ 
+                [i, f.unique().tolist()] 
+                for i,f in enumerate(cls_gt) 
+        ]
+        # for i,labels in obj_labels:
+        #     labels.remove(0) # remove background
+
+        obj_masks = torch.stack([
+                cls_gt[i] == label 
+                for i,labels in obj_labels
+                for label in labels
+        ])
+        N = obj_masks.shape[0]
+        broadcast_map = [
+                i
+                for i,labels in obj_labels
+                for label in labels
+        ]
+
+        aggregate_map = []
+        for i,labels in obj_labels:
+            aggregate_map.append([i]*len(labels))
+        
+        self.B = B
+        self.N = N
+        self.H = H
+        self.W = W
+        self.broadcast_map = broadcast_map
+        self.aggregate_map = aggregate_map
+        self.obj_labels = obj_labels
+        self._memory_has_init = False
+        
+        return obj_masks # N,H,W
+
+    def split_masks(self, cls_gt):
+        obj_labels = self.obj_labels
+        obj_masks = torch.stack([
+                cls_gt[i] == label 
+                for i,labels in obj_labels
+                for label in labels
+        ])
+        return obj_masks
+
     def add_memory(self,key,value,mask):
-        if self.num_frames < self.MAX_NUM_MEMORY:
-            i = self.num_frames
-            self.mem_keys[i] = key
-            self.mem_values[i] = value
-            self.mem_mask[i] = mask
+        if self._memory_has_init:
+            self.mem_keys = torch.cat([self.mem_keys, key.unsqueeze(2)],dim=2)
+            self.mem_values = torch.cat([self.mem_values, value.unsqueeze(2)],dim=2)
+            self.mem_masks = torch.cat([self.mem_masks, mask.unsqueeze(0)],dim=0)
         else:
-            self.mem_keys = torch.cat([self.mem_keys,key])
+            self.mem_keys = key.unsqueeze(2) # B,C,T,H,W
+            self.mem_values = value.unsqueeze(2) # N,C,T,H,W
+            self.mem_masks = mask.unsqueeze(0) # N,H,W
+            self._memory_has_init = True
 
-        self.num_frames += 1
 
-    def read_memory(self,key):
-        mk = self.mem_keys[:self.num_frames]
-        mv = self.mem_value[:self.num_frames]
-        qk = key
+    def read_memory(self,qk):
+        # qk:B,C,H,W
+        mk = self.mem_keys 
+        mv = self.mem_values
         
         B, CK, T, H, W = mk.shape
-        mk = mk.flatten(start_dim=2)
-        qk = qk.flatten(start_dim=2)
+        mk = mk.flatten(start_dim=2) # B,C,THW
+        qk = qk.flatten(start_dim=2) # B,C,HW
 
         # See supplementary material
-        a_sq = mk.pow(2).sum(1).unsqueeze(2)
-        ab = mk.transpose(1, 2) @ qk
+        a_sq = mk.pow(2).sum(1).unsqueeze(2) # B,THW,1
+        ab = mk.transpose(1, 2) @ qk # B,THW,HW
 
-        affinity = (2*ab-a_sq) / math.sqrt(CK)   # B, THW, HW
+        frame_affinity = (2*ab-a_sq) / math.sqrt(CK)   # B, THW, HW
         
         # softmax operation; aligned the evaluation style
-        maxes = torch.max(affinity, dim=1, keepdim=True)[0]
-        x_exp = torch.exp(affinity - maxes)
+        maxes = torch.max(frame_affinity, dim=1, keepdim=True)[0]
+        x_exp = torch.exp(frame_affinity - maxes)
         x_exp_sum = torch.sum(x_exp, dim=1, keepdim=True)
-        affinity = x_exp / x_exp_sum 
+        affinity = x_exp / x_exp_sum  # B,THW,HW
 
-        B, CV, T, H, W = mv.shape
+        obj_affinity = frame_affinity[self.broadcast_map] # N,THW,HW
+        N, CV, T, H, W = mv.shape
 
-        mo = mv.view(B, CV, T*H*W) 
-        mem = torch.bmm(mo, affinity) # Weighted-sum B, CV, HW
-        mem_out = mem.view(B, CV, H, W)
-        return mem_out
+        mo = mv.view(N, CV, T*H*W) 
+        obj_read_values = torch.bmm(mo, obj_affinity) # N, CV, HW
+        obj_read_values = obj_read_values.view(N, CV, H, W)
+        return obj_read_values
 
-    def mask_decoder(self,read_value,kf16_thin, kf16, kf8, kf4):
-        mask_value = torch.cat([read_value, kf16_thin])
-        logits = self.decoder(mask_value,kf8,kf4)
+    def mask_decoder(self,obj_read_values,kf16_thin, kf8, kf4):
+        ii = self.broadcast_map
+        obj_mask_value = torch.cat([obj_read_values, kf16_thin[ii]],dim=1)
+        logits = self.decoder(obj_mask_value,kf8[ii],kf4[ii])
         prob = torch.sigmoid(logits)
-        logits = self.aggregate(prob)
-        prob = F.softmax(logits,dim=1)[:,1:]
-        return logits, prob
+        return logits.squeeze(1),prob.squeeze(1)
 
     def forward(self,current_frame):
-        image = current_frame['rgb']  # BxCxHxW
-        key, *fine_features = self.encode_key(image.unsqueeze(1))
-        # kf16_thin, kf16, kf8, kf4 
+        image = current_frame['rgb'] 
+        frame_key, kf16_thin, kf16, kf8, kf4  = self.encode_key(image)
+        # 除非特殊说明，所有Tensor的维度都是 B,C,H,W
         if current_frame['is_ref']:
-            mask = current_frame['gt'] # BxHxW
-            logits = None
-            self.reset_memory(mask)
+            cls_gt = current_frame['cls_gt'] # B,H,W
+            obj_logits = None
+            obj_masks = self.init_obj(cls_gt)
         else:
-            read_value = self.read_memory(key)
-            mask,logits = self.mask_decoder(read_value, *fine_features)
-
-        mem_value = self.value_encoder(image,key,mask.squeeze(),mask.squeeze())
-        self.add_memory(key,mem_value,mask)
+            obj_read_values = self.read_memory(frame_key) 
+            obj_masks,obj_logits = self.mask_decoder(obj_read_values, kf16_thin, kf8, kf4)
+        ii = self.broadcast_map # broadcast B,C,H,W to N,C,H,W ,from B frames to N objects
+        obj_mem_values = self.value_encoder(image[ii],kf16[ii],obj_masks.unsqueeze(1))
+        self.add_memory(frame_key,obj_mem_values,obj_masks)
         return {
-            'pred_mask':mask,
-            'pred_logits':logits,
+            'pred_mask':obj_masks,
+            'pred_logits':obj_logits,
+            'gt_mask':self.split_masks(current_frame['cls_gt']),
             **current_frame
         }
 
     def train_step(self,data,optimizer):
         B,T,C,H,W = data['rgb'].shape
+        for k, v in data.items():
+            if type(v) != list and type(v) != dict and type(v) != int:
+                data[k] = v.cuda(non_blocking=True)
         loss = 0
-        for i in range(T):
+        from tqdm import tqdm
+        for i in tqdm(range(T)):
             currents_frame = {
-                'rgb':data['rgb'][:,i],
-                'gt':data['gt'][:,i],
-                'cls_gt':data['cls_gt'][:,i],
-                'sec_gt':data['sec_gt'][:,i],
-                'selector':data['selector'],
+                'rgb':data['rgb'][:,i],  # B,3,H,W
+                'cls_gt':data['cls_gt'][:,i], # B,H,W \in 0,1,2...
                 'name':data['info']['name'],
                 'frames': [x[i] for x in data['info']['frames']],
                 'is_ref': True if i == 0 else False
             }
             output = self.forward(currents_frame)
-            loss += self.loss_fn(output)
+            # loss += self.loss_fn(output)
 
-        return loss
+        return {
+            'loss':loss
+        }
             
     def val_step(self,data,optimizer):
         with torch.no_grad():

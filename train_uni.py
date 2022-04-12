@@ -28,25 +28,26 @@ davis_im_path = Path(para['davis_root']) / '2017' / 'trainval' / 'JPEGImages' / 
 davis_mask_path = Path(para['davis_root']) / '2017' / 'trainval' / 'Annotations' / '480p'
 max_skip = 20
 
-davis_dataset = VOSDataset(davis_im_path,davis_mask_path,max_skip, is_bl=False, subset=load_sub_davis())
-train_loader = DataLoader(davis_dataset, para['batch_size'], num_workers=para['num_workers'],drop_last=True, pin_memory=True)
+debug_subset = set(list(load_sub_davis())[:16])
+davis_dataset = VOSDataset(davis_im_path,davis_mask_path,max_skip, is_bl=False, subset=debug_subset)
+train_loader = DataLoader(davis_dataset, 4, num_workers=para['num_workers'],drop_last=True, pin_memory=True)
 optimizer = optim.Adam(filter(
     lambda p: p.requires_grad, stcn_model.parameters()), lr=para['lr'], weight_decay=1e-7)
 scheduler = optim.lr_scheduler.MultiStepLR(optimizer, para['steps'], para['gamma'])
 logger = get_logger('stcn')
 runner = EpochBasedRunner(
-    model = stcn_model,
+    model = stcn_model.cuda(),
     optimizer=optimizer,
     work_dir='/tmp/debug',
     logger=logger,
-    max_epochs=4
+    max_epochs=2
 )
 # learning rate scheduler config
 lr_config = dict(policy='step', step=[2, 3])
 # configuration of optimizer
 optimizer_config = dict(grad_clip=None)
 # configuration of saving checkpoints periodically
-checkpoint_config = dict(interval=1)
+checkpoint_config = dict(interval=10)
 # save log periodically and multiple hooks can be used simultaneously
 log_config = dict(interval=100, hooks=[dict(type='TextLoggerHook')])
 # register hooks to runner and those hooks will be invoked automatically

@@ -102,27 +102,29 @@ class STCN(nn.Module):
         return logits
 
     def encode_key(self, frame): 
-        # input: b*t*c*h*w
-        if len(frame.shape) == 4:
-            frame.unsqueeze(1)
-        b, t = frame.shape[:2]
+        # input: b*c*h*w
+        b = frame.shape[0]
 
-        f16, f8, f4 = self.key_encoder(frame.flatten(start_dim=0, end_dim=1))
+        f16, f8, f4 = self.key_encoder(frame)
         k16 = self.key_proj(f16)
         f16_thin = self.key_comp(f16)
 
-        # B*C*T*H*W
-        k16 = k16.view(b, t, *k16.shape[-3:]).transpose(1, 2).contiguous()
+        # B*C*H*W
+        k16 = k16.view(b, *k16.shape[-3:]).contiguous()
 
-        # B*T*C*H*W
-        f16_thin = f16_thin.view(b, t, *f16_thin.shape[-3:])
-        f16 = f16.view(b, t, *f16.shape[-3:])
-        f8 = f8.view(b, t, *f8.shape[-3:])
-        f4 = f4.view(b, t, *f4.shape[-3:])
+        # B*C*H*W
+        f16_thin = f16_thin.view(b, *f16_thin.shape[-3:])
+        f16 = f16.view(b, *f16.shape[-3:])
+        f8 = f8.view(b, *f8.shape[-3:])
+        f4 = f4.view(b, *f4.shape[-3:])
 
         return k16, f16_thin, f16, f8, f4
 
     def encode_value(self, frame, kf16, mask, other_mask=None): 
+        # Extract memory key/value for a frame
+        # frame BxTxHxW
+        # kf16 Bx1024xhxw
+        # mask Bx1xHxW
         # Extract memory key/value for a frame
         if self.single_object:
             f16 = self.value_encoder(frame, kf16, mask)
