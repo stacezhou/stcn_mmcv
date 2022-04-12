@@ -21,24 +21,28 @@ skip_values = [10, 15, 20, 25, 5]
 def get_dataset(stage=3,max_skip=5,valset=False):
     print('Renewed with skip: ', max_skip)
     if valset == True:
-        yv_dataset = VOSDataset(path.join(yv_root, 'JPEGImages'), 
-                            path.join(yv_root, 'Annotations'), max_skip//5, is_bl=False,val=True, subset=load_sub_yv())
-        davis_dataset = VOSDataset(path.join(davis_root, 'JPEGImages', '480p'), 
-                            path.join(davis_root, 'Annotations', '480p'), max_skip, is_bl=False,val=True, subset=load_sub_davis())
-        eval_dataset = ConcatDataset([davis_dataset] + [yv_dataset])
-        return eval_dataset
+        if stage != 0:
+            yv_dataset = VOSDataset(path.join(yv_root, 'JPEGImages'), 
+                                path.join(yv_root, 'Annotations'), max_skip//5, is_bl=False,val=True, subset=load_sub_yv())
+            davis_dataset = VOSDataset(path.join(davis_root, 'JPEGImages', '480p'), 
+                                path.join(davis_root, 'Annotations', '480p'), max_skip, is_bl=False,val=True, subset=load_sub_davis())
+            eval_dataset = ConcatDataset([davis_dataset]*25 + [yv_dataset]*5)
+            return eval_dataset
+        else:
+            duts_te_dataset = StaticTransformDataset(path.join(static_root, 'DUTS-TE'), method=1)
+            return duts_te_dataset
+
 
 
     if stage == 0:
-        fss_dataset = StaticTransformDataset(path.join(static_root, 'fss'), method=0)
+        # fss_dataset = StaticTransformDataset(path.join(static_root, 'fss'), method=0)
         duts_tr_dataset = StaticTransformDataset(path.join(static_root, 'DUTS-TR'), method=1)
-        duts_te_dataset = StaticTransformDataset(path.join(static_root, 'DUTS-TE'), method=1)
         ecssd_dataset = StaticTransformDataset(path.join(static_root, 'ecssd'), method=1)
         big_dataset = StaticTransformDataset(path.join(static_root, 'BIG_small'), method=1)
         hrsod_dataset = StaticTransformDataset(path.join(static_root, 'HRSOD_small'), method=1)
 
         # BIG and HRSOD have higher quality, use them more
-        train_dataset = ConcatDataset([fss_dataset, duts_tr_dataset, duts_te_dataset, ecssd_dataset]
+        train_dataset = ConcatDataset([duts_tr_dataset, ecssd_dataset]
                 + [big_dataset, hrsod_dataset]*5)
 
         print('Static dataset size: ', len(train_dataset))
@@ -54,7 +58,7 @@ def get_dataset(stage=3,max_skip=5,valset=False):
                             path.join(yv_root, 'Annotations'), max_skip//5, is_bl=False, subset=load_sub_yv())
         davis_dataset = VOSDataset(path.join(davis_root, 'JPEGImages', '480p'), 
                             path.join(davis_root, 'Annotations', '480p'), max_skip, is_bl=False, subset=load_sub_davis())
-        train_dataset = ConcatDataset([davis_dataset]*5 + [yv_dataset])
+        train_dataset = ConcatDataset([davis_dataset]*50 + [yv_dataset]*10)
 
         print('YouTube dataset size: ', len(yv_dataset))
         print('DAVIS dataset size: ', len(davis_dataset))

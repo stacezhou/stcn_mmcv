@@ -39,8 +39,9 @@ class LossComputer(nn.Module):
         cls_gt = output['cls_gt']
         obj_map = output['obj_map']
         for i,per_frame in enumerate(obj_map):
-            losses['total_loss'] = losses['total_loss'] + self.bce(pred_logits[per_frame].unsqueeze(0),
-                                    cls_gt[i].unsqueeze(0),it)[0]
+            c_gt = cls_gt[i].unsqueeze(0)
+            logits = pred_logits[per_frame].unsqueeze(0)
+            losses['total_loss'] = losses['total_loss'] + self.bce(logits,c_gt,it)[0]
         
         return losses
 
@@ -94,15 +95,10 @@ class STCNModel(nn.Module):
 
         return prob,logits
 
-    def init_memory(self,cls_gt):
+    def init_memory(self,cls_gt,obj_labels):
         B,H,W = cls_gt.shape
-        obj_labels = [ 
-                [i, sorted(f.unique().tolist())] 
-                for i,f in enumerate(cls_gt) 
-        ]
         # for i,labels in obj_labels:
         #     labels.remove(0) # remove background
-
         obj_masks = torch.stack([
                 cls_gt[i] == label 
                 for i,labels in obj_labels
@@ -188,7 +184,7 @@ class STCNModel(nn.Module):
         if current_frame['is_ref']:
             cls_gt = current_frame['cls_gt'] # B,H,W
             obj_logits = None
-            obj_masks = self.init_memory(cls_gt)
+            obj_masks = self.init_memory(cls_gt, current_frame['obj_labels_w_bg'])
         else:
             obj_read_values = self.read_memory(frame_key) 
             obj_masks,obj_logits = self.decode_mask(obj_read_values, kf16_thin, kf8, kf4)
@@ -215,8 +211,9 @@ class STCNModel(nn.Module):
                 'rgb':data['rgb'][:,i],  # B,3,H,W
                 'cls_gt':data['cls_gt'][:,i], # B,H,W \in 0,1,2...
                 'name':data['info']['name'],
-                'frames': [x[i] for x in data['info']['frames']],
-                'is_ref': True if i == 0 else False
+                # 'frames': [x[i] for x in data['info']['frames']],
+                'is_ref': True if i == 0 else False,
+                'obj_labels_w_bg': [[idx,x.unique().tolist()] for idx,x in enumerate(data['cls_gt'])]
             }
             output = self.forward(currents_frame)
             if output['is_ref']:
@@ -227,7 +224,7 @@ class STCNModel(nn.Module):
             loss = loss  +  self.loss_fn(output)['total_loss']
 
         if return_loss == False:
-            return [(total_i / total_u).cpu().numpy()]
+            return [(total_i / total_u).cpu().numpy().tolist()] * B
 
         return {
             'loss':loss,

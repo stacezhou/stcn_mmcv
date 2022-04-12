@@ -12,6 +12,7 @@ from pathlib import Path
 from os import environ
 from dataset_uni import get_dataset,para,increase_skip_fraction,get_dataloader
 
+MAX_EPOCH = 1000
 ####### parameters
 # random seed
 torch.manual_seed(14159265)
@@ -37,7 +38,7 @@ def renew_dataloader(**kw):
     dataset = get_dataset(**kw)
     return get_dataloader(dataset,world_size,local_rank)
 
-eval_dataloader = renew_dataloader(max_skip=10, valset=False)
+eval_dataloader = renew_dataloader(stage=3, max_skip=25, valset=True)
 
 ####### model
 stcn_model = STCNModel()
@@ -52,10 +53,10 @@ logger = get_logger('stcn')
 runner = EpochBasedRunner(
     model = stcn_model.cuda(),
     optimizer=optimizer,
-    work_dir='/tmp/debug',
+    work_dir='work_dir',
     logger=logger,
     meta={},
-    max_epochs=1000
+    max_epochs=MAX_EPOCH
 )
 # learning rate scheduler config
 lr_config = dict(policy='step', step=[2, 3])
@@ -65,9 +66,9 @@ if para['amp']:
 else:
     optimizer_config = dict(grad_clip=None)
 # configuration of saving checkpoints periodically
-checkpoint_config = dict(interval=100)
+checkpoint_config = dict(interval=1)
 # save log periodically and multiple hooks can be used simultaneously
-log_config = dict(interval=5, 
+log_config = dict(interval=1, 
     hooks=[dict(type='TextLoggerHook'),dict(type='TensorboardLoggerHook')
     ])
 runner.register_training_hooks(
@@ -84,20 +85,26 @@ def evaluate(results):
     min = iou.min()
     return {'iou_mean': mean, 'iou_max': max,'iou_min':min}
 if world_size > 1:
-    runner.register_hook(DistEvalHook(eval_dataloader, interval=10, evaluate_fn=evaluate))
+    runner.register_hook(DistEvalHook(eval_dataloader, interval=1,start=0, evaluate_fn=evaluate,gpu_collect=True))
 else:
-    runner.register_hook(EvalHook(eval_dataloader, interval=10, evaluate_fn=evaluate))
+    runner.register_hook(EvalHook(eval_dataloader, interval=1,start=0, evaluate_fn=evaluate))
 
 runner.run(
     [   
         renew_dataloader(stage=0),
-        renew_dataloader(stage=3,max_skip=5),
         renew_dataloader(stage=3,max_skip=10),
+        renew_dataloader(stage=3,max_skip=15),
+        renew_dataloader(stage=3,max_skip=20),
+        renew_dataloader(stage=3,max_skip=25),
+        renew_dataloader(stage=3,max_skip=5),
     ],
     [
-        ('train',10),
         ('train',1),
-        ('train',1)
+        ('train',50),
+        ('train',50),
+        ('train',50),
+        ('train',249),
+        ('train',100)
     ]
 )
 
