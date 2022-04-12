@@ -29,7 +29,8 @@ davis_mask_path = Path(para['davis_root']) / '2017' / 'trainval' / 'Annotations'
 max_skip = 20
 
 debug_subset = set(list(load_sub_davis())[:16])
-davis_dataset = VOSDataset(davis_im_path,davis_mask_path,max_skip, is_bl=False, subset=debug_subset)
+train_subset = load_sub_davis()
+davis_dataset = VOSDataset(davis_im_path,davis_mask_path,max_skip, is_bl=False, subset=train_subset)
 train_loader = DataLoader(davis_dataset, 4, num_workers=para['num_workers'],drop_last=True, pin_memory=True)
 optimizer = optim.Adam(filter(
     lambda p: p.requires_grad, stcn_model.parameters()), lr=para['lr'], weight_decay=1e-7)
