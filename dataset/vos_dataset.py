@@ -213,9 +213,3 @@ class VOSDataset(Dataset):
     def __len__(self):
         return len(self.videos)
     
-    def evaluate(self,results,*k,**kw):
-        iou = np.array(results)
-        mean = iou.mean()
-        max = iou.max()
-        min = iou.min()
-        return {'iou_mean': mean, 'iou_max': max,'iou_min':min}
