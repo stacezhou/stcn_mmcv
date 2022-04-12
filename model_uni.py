@@ -204,7 +204,8 @@ class STCNModel(nn.Module):
         for k, v in data.items():
             if type(v) != list and type(v) != dict and type(v) != int:
                 data[k] = v.cuda(non_blocking=True)
-        loss = total_i = 0
+        loss = 0
+        total_i = 0
         total_u = 1
         for i in range(T):
             currents_frame = {
@@ -217,14 +218,18 @@ class STCNModel(nn.Module):
             output = self.forward(currents_frame)
             if output['is_ref']:
                 continue
-            # ti,tu = compute_tensor_iu(output['pred_logits'] > 0.5, output['gt_mask'] > 0.5)
-            # total_i += ti
-            # total_u += tu
+            ti,tu = compute_tensor_iu(output['pred_logits'] > 0.5, output['gt_mask'] > 0.5)
+            total_i += ti.detach().cpu()
+            total_u += tu.detach().cpu()
             loss = loss  +  self.loss_fn(output)['total_loss']
 
         return {
             'loss':loss,
-            # 'iou': total_i / total_u
+            'log_vars':{
+                'loss':loss.detach().cpu(),
+                'iou': total_i / total_u
+            },
+            'num_samples' : B
         }
             
     def val_step(self,data,optimizer):

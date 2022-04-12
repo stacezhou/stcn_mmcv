@@ -26,12 +26,15 @@ stcn_model = STCNModel()
 
 davis_im_path = Path(para['davis_root']) / '2017' / 'trainval' / 'JPEGImages' / '480p'
 davis_mask_path = Path(para['davis_root']) / '2017' / 'trainval' / 'Annotations' / '480p'
-max_skip = 20
+yv_im_path = Path(para['yv_root']) / 'train_480p' / 'JPEGImages' 
+yv_mask_path = Path(para['yv_root']) / 'train' / 'Annotations' 
+max_skip = 5
 
-debug_subset = set(list(load_sub_davis())[:16])
+yv_dataset = VOSDataset(yv_im_path,yv_mask_path,max_skip//5, is_bl=False, subset=load_sub_yv())
 train_subset = load_sub_davis()
 davis_dataset = VOSDataset(davis_im_path,davis_mask_path,max_skip, is_bl=False, subset=train_subset)
-train_loader = DataLoader(davis_dataset, 4, num_workers=para['num_workers'],drop_last=True, pin_memory=True)
+train_dataset = ConcatDataset([davis_dataset]*5 + [yv_dataset])
+train_loader = DataLoader(train_dataset, 4, num_workers=para['num_workers'],drop_last=True, pin_memory=True)
 optimizer = optim.Adam(filter(
     lambda p: p.requires_grad, stcn_model.parameters()), lr=para['lr'], weight_decay=1e-7)
 scheduler = optim.lr_scheduler.MultiStepLR(optimizer, para['steps'], para['gamma'])
@@ -41,16 +44,18 @@ runner = EpochBasedRunner(
     optimizer=optimizer,
     work_dir='/tmp/debug',
     logger=logger,
-    max_epochs=2
+    max_epochs=1000
 )
 # learning rate scheduler config
 lr_config = dict(policy='step', step=[2, 3])
 # configuration of optimizer
 optimizer_config = dict(grad_clip=None)
 # configuration of saving checkpoints periodically
-checkpoint_config = dict(interval=10)
+checkpoint_config = dict(interval=100)
 # save log periodically and multiple hooks can be used simultaneously
-log_config = dict(interval=100, hooks=[dict(type='TextLoggerHook')])
+log_config = dict(interval=5, 
+    hooks=[dict(type='TextLoggerHook'),dict(type='TensorboardLoggerHook')
+    ])
 # register hooks to runner and those hooks will be invoked automatically
 runner.register_training_hooks(
     lr_config=lr_config,
@@ -60,5 +65,5 @@ runner.register_training_hooks(
 
 runner.run(
     [train_loader],
-    [('train',1)]
+    [('train',10)]
 )
