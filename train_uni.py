@@ -59,7 +59,11 @@ runner = EpochBasedRunner(
 )
 # learning rate scheduler config
 lr_config = dict(policy='step', step=[2, 3])
-optimizer_config = dict(grad_clip=None)
+if para['amp']:
+    from mmcv.runner.hooks import Fp16OptimizerHook
+    optimizer_config = Fp16OptimizerHook(grad_clip=None,loss_scale='dynamic')
+else:
+    optimizer_config = dict(grad_clip=None)
 # configuration of saving checkpoints periodically
 checkpoint_config = dict(interval=100)
 # save log periodically and multiple hooks can be used simultaneously
@@ -86,12 +90,12 @@ else:
 
 runner.run(
     [   
-        # renew_dataloader(stage=0),
+        renew_dataloader(stage=0),
         renew_dataloader(stage=3,max_skip=5),
         renew_dataloader(stage=3,max_skip=10),
     ],
     [
-        # ('train',1),
+        ('train',10),
         ('train',1),
         ('train',1)
     ]
