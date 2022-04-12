@@ -178,7 +178,10 @@ class STCNModel(nn.Module):
         obj_read_values = obj_read_values.view(N, CV, H, W)
         return obj_read_values
 
-    def forward(self,current_frame):
+    def forward(self,current_frame=dict(),return_loss=True,**data):
+        if len(current_frame) == 0 and len(data) != 0 and return_loss == False:
+            return self.train_step(data,None,return_loss=False)
+
         image = current_frame['rgb'] 
         frame_key, kf16_thin, kf16, kf8, kf4  = self.encode_key(image)
         # 除非特殊说明，所有Tensor的维度都是 B,C,H,W
@@ -199,7 +202,7 @@ class STCNModel(nn.Module):
             **current_frame
         }
 
-    def train_step(self,data,optimizer):
+    def train_step(self,data,optimizer,return_loss=True):
         B,T,C,H,W = data['rgb'].shape
         for k, v in data.items():
             if type(v) != list and type(v) != dict and type(v) != int:
@@ -223,6 +226,9 @@ class STCNModel(nn.Module):
             total_u += tu.detach().cpu()
             loss = loss  +  self.loss_fn(output)['total_loss']
 
+        if return_loss == False:
+            return [(total_i / total_u).cpu().numpy()]
+
         return {
             'loss':loss,
             'log_vars':{
@@ -233,9 +239,7 @@ class STCNModel(nn.Module):
         }
             
     def val_step(self,data,optimizer):
-        with torch.no_grad():
-            output = self.forward(data)
-        return output
+        pass
     
     def split_masks(self, cls_gt):
         obj_labels = self.obj_labels

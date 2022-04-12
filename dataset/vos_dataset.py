@@ -27,6 +27,7 @@ class VOSDataset(Dataset):
         self.gt_root = gt_root
         self.max_jump = max_jump
         self.is_bl = is_bl
+        self.val = val
 
         self.videos = []
         self.frames = {}
@@ -211,3 +212,10 @@ class VOSDataset(Dataset):
 
     def __len__(self):
         return len(self.videos)
+    
+    def evaluate(self,results,*k,**kw):
+        iou = np.array(results)
+        mean = iou.mean()
+        max = iou.max()
+        min = iou.min()
+        return {'iou_mean': mean, 'iou_max': max,'iou_min':min}
