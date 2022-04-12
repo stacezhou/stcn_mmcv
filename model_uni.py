@@ -92,7 +92,7 @@ class STCNModel(nn.Module):
         for obj_per_frame in self.aggregate_map:
             prob[obj_per_frame] = F.log_softmax(logits[obj_per_frame],dim=0)
 
-        return logits,prob
+        return prob,logits
 
     def init_memory(self,cls_gt):
         B,H,W = cls_gt.shape
