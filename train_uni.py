@@ -40,7 +40,7 @@ def renew_dataloader(**kw):
     dataset = get_dataset(**kw)
     return get_dataloader(dataset,world_size,local_rank)
 
-eval_dataloader = renew_dataloader(stage=3, max_skip=25, valset=True)
+eval_dataloader = renew_dataloader(stage=3, max_skip=10, valset=True)
 
 ####### model
 stcn_model = STCNModel()
@@ -52,10 +52,15 @@ optimizer = optim.Adam(filter(
     lambda p: p.requires_grad, stcn_model.parameters()), lr=para['lr'], weight_decay=1e-7)
 scheduler = optim.lr_scheduler.MultiStepLR(optimizer, para['steps'], para['gamma'])
 logger = get_logger('stcn')
+if para['id'] != 'NULL':
+    work_dir = f'work_dir/{para["id"]}'
+else:
+    work_dir = f'work_dir/exp_{datetime.datetime.now().strftime("%b%d_%H.%M.%S")}'
+
 runner = EpochBasedRunner(
     model = stcn_model.cuda(),
     optimizer=optimizer,
-    work_dir=f'work_dir/exp_{datetime.datetime.now().strftime("%b%d_%H.%M.%S")}',
+    work_dir=work_dir,
     logger=logger,
     meta={},
     max_epochs=MAX_EPOCH
@@ -92,6 +97,8 @@ else:
     runner.register_hook(EvalHook(eval_dataloader, interval=5,start=1, evaluate_fn=evaluate))
 
 np.random.seed(np.random.randint(2**30-1) + local_rank*100)
+if para['load_model']:
+    runner.resume(para['load_model'])
 
 runner.run(
     [   

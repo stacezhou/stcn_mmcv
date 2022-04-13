@@ -12,4 +12,4 @@ python -m torch.distributed.launch \
     --master_addr=$MASTER_ADDR \
     --master_port=$PORT \
     --nproc_per_node=$GPUS \
-    train_uni.py 
+    train_uni.py ${@:2}
