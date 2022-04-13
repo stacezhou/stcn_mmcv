@@ -47,50 +47,63 @@ if world_size > 1:
 optimizer = optim.Adam(filter(
     lambda p: p.requires_grad, stcn_model.parameters()), lr=para['lr'], weight_decay=1e-7)
 
-MAX_EPOCH = 3000
 runner = EpochBasedRunner(
     model = stcn_model,
     lr_config={'policy':'step','step':[1000,2000],'gamma':0.1},
     optimizer=optimizer,
     exp_id=para['id'],
-    max_epochs=MAX_EPOCH
+    log_interval=10,
+    checkpoint_interval=2
 )
 
 ##### eval config
-def evaluate(results):
-    iou = np.array(results)
-    mean = iou.mean()
-    max = iou.max()
-    min = iou.min()
-    return {'iou_mean': mean, 'iou_max': max,'iou_min':min}
+def evaluate(results,label):
+    iou = np.array(results).mean()
+    return {f'iou_{label}': iou}
 
 eval_dataloader = renew_dataloader(stage=3, max_skip=10, valset=True)
+eval_static_dataloader = renew_dataloader(stage=0,valset=True)
 if world_size > 1:
-    runner.register_hook(DistEvalHook(eval_dataloader, interval=5,start=1, evaluate_fn=evaluate,gpu_collect=True))
+    runner.register_hook(DistEvalHook(eval_static_dataloader, interval=1,start=2, 
+        evaluate_fn=lambda x:evaluate(x,'duts_te'),gpu_collect=True))
+    runner.register_hook(DistEvalHook(eval_dataloader, interval=1,start=2, 
+        evaluate_fn=lambda x:evaluate(x,'davis_val'),gpu_collect=True))
 else:
-    runner.register_hook(EvalHook(eval_dataloader, interval=5,start=1, evaluate_fn=evaluate))
+    runner.register_hook(EvalHook(eval_static_dataloader, interval=1,start=2, 
+        evaluate_fn=lambda x:evaluate(x,'duts_te')))
+    runner.register_hook(EvalHook(eval_dataloader, interval=1,start=2,
+        evaluate_fn=lambda x:evaluate(x,'davis_val')))
 
 ##### runner run
-if para['load_model']:
+if para['load_model'] is not None:
     runner.resume(para['load_model'])
-
 runner.run(
     [   
-        renew_dataloader(stage=0),
-        renew_dataloader(stage=3,max_skip=10),
+        renew_dataloader(stage=0), # 6000 iter per epch for stage 0
+        renew_dataloader(stage=0,sec=True), # 6000 iter per epch for stage 0
+    ],
+    [
+        ('train',1),
+        ('train',1),
+    ],
+    max_epochs = 10
+)
+runner.run(
+    [   
+        renew_dataloader(stage=3,max_skip=10), # 6000 iter per epoch for stage 3
         renew_dataloader(stage=3,max_skip=15),
         renew_dataloader(stage=3,max_skip=20),
         renew_dataloader(stage=3,max_skip=25),
         renew_dataloader(stage=3,max_skip=5),
     ],
     [
-        ('train',10),
-        ('train',100),
-        ('train',100),
-        ('train',100),
-        ('train',400),
-        ('train',200)
-    ]
+        ('train',3),
+        ('train',3),
+        ('train',2),
+        ('train',8),
+        ('train',4)
+    ],
+    max_epochs=runner.epoch + 20
 )
 
 if world_size > 1:

@@ -52,7 +52,6 @@ class EpochBasedRunner(EpochBasedRunner_):
             optimizer_config=optimizer_config,
             checkpoint_config=checkpoint_config,
             log_config=log_config,
-            timer_config=None
         )
 
         self.register_hook(DistSamplerSeedHook())

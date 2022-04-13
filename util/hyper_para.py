@@ -31,7 +31,7 @@ class HyperParameters():
 
         # Loading
         parser.add_argument('--load_network', help='Path to pretrained network weight only')
-        parser.add_argument('--load_model', help='Path to the model file, including network, optimizer and such')
+        parser.add_argument('--load_model', help='Path to the model file, including network, optimizer and such', default=None)
 
         # Logging information
         parser.add_argument('--id', help='Experiment UNIQUE id, use NULL to disable logging to tensorboard', default=None)
