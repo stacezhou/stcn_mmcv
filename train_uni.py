@@ -46,12 +46,11 @@ if world_size > 1:
 ####### runner
 optimizer = optim.Adam(filter(
     lambda p: p.requires_grad, stcn_model.parameters()), lr=para['lr'], weight_decay=1e-7)
-scheduler = optim.lr_scheduler.MultiStepLR(optimizer, para['steps'], para['gamma'])
 
 MAX_EPOCH = 3000
 runner = EpochBasedRunner(
     model = stcn_model,
-    lr_config={'policy':'step','step':[1000,2000]},
+    lr_config={'policy':'step','step':[1000,2000],'gamma':0.1},
     optimizer=optimizer,
     exp_id=para['id'],
     max_epochs=MAX_EPOCH
@@ -85,12 +84,12 @@ runner.run(
         renew_dataloader(stage=3,max_skip=5),
     ],
     [
-        ('train',2),
-        ('train',50),
-        ('train',50),
-        ('train',50),
-        ('train',248),
-        ('train',100)
+        ('train',10),
+        ('train',100),
+        ('train',100),
+        ('train',100),
+        ('train',400),
+        ('train',200)
     ]
 )
 

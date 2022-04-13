@@ -25,8 +25,10 @@ class EpochBasedRunner(EpochBasedRunner_):
             work_dir = f'work_dir/exp_{datetime.now().strftime("%b%d_%H.%M.%S")}'
             logger = get_logger('exp')
             
-        super().__init__(model, batch_processor, optimizer,  
-            max_iters, max_epochs,
+        super().__init__(model=model, batch_processor=batch_processor,
+            optimizer=optimizer,  
+            max_iters=max_iters, 
+            max_epochs=max_epochs,
             meta = meta,
             logger=logger,
             work_dir=work_dir,)
