@@ -34,7 +34,7 @@ class HyperParameters():
         parser.add_argument('--load_model', help='Path to the model file, including network, optimizer and such')
 
         # Logging information
-        parser.add_argument('--id', help='Experiment UNIQUE id, use NULL to disable logging to tensorboard', default='NULL')
+        parser.add_argument('--id', help='Experiment UNIQUE id, use NULL to disable logging to tensorboard', default=None)
         parser.add_argument('--debug', help='Debug mode which logs information more often', action='store_true')
 
         # Multiprocessing parameters, not set by users
