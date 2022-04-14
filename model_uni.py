@@ -35,9 +35,9 @@ class LossComputer(nn.Module):
         super().__init__()
         self.bce = BootstrappedCE()
 
-    def forward(self, pred_logits,cls_gt,obj_map, it=0):
+    def forward(self, pred_logits,cls_gt,objs, it=0):
         loss = 0
-        for i,per_frame in enumerate(obj_map):
+        for per_frame,(i,label) in enumerate(objs):
             c_gt = cls_gt[i].unsqueeze(0)
             logits = pred_logits[per_frame].unsqueeze(0)
             loss += self.bce(logits,c_gt,it)[0]
@@ -61,7 +61,114 @@ class STCNModel(nn.Module):
         # Compress f16 a bit to use in decoding later on
         self.mask_decoder = Decoder()
         self.loss_fn = LossComputer()
+        self.mem_objs = [] # (No.frame, cls_label)
     
+    def forward(self,return_loss=False,**data_batch):
+        assert 'rgb' in data_batch
+        assert 'cls_gt' in data_batch
+
+        if return_loss:
+            loss = 0
+            total_i = 0
+            total_u = 1
+        else:
+            batch_masks = []
+
+        B,T,C,H,W = data_batch['rgb'].shape
+        if 'reset_memory' not in data_batch or data_batch['reset_memory']:
+            self.mem_objs = []
+        # 每一个样本(共B个)，含有哪些目标
+        for i in range(T):
+            image = data_batch['rgb'][:,i] # B,3,H,W ,默认所有Tensor都是 B,C,H,W
+            cls_gt = data_batch['cls_gt'][:,i] # B,H,W
+
+            # 出现了新的目标 gt
+            this_objs = [
+                (i,l) 
+                for i,x in enumerate(cls_gt)
+                for l in x.unique()
+            ]
+            new_objs = list(set(this_objs) - set(self.mem_objs))
+            self.get_new_objs = len(new_objs) > 0
+            if self.get_new_objs:
+                # update object ids & map
+                self.mem_objs.extend(new_objs)
+                new_obj_masks = torch.stack([
+                    cls_gt[i] == label
+                    for i,label in new_objs
+                ])
+                _new_obj_prob = new_obj_masks.float().clamp(1e-7, 1-1e-7)
+                new_obj_logits = torch.log(_new_obj_prob / (1 - _new_obj_prob))
+
+            # 预测目标
+            frame_key, kf16_thin, kf16, kf8, kf4  = self.encode_key(image)
+            if self.has_memory:
+                obj_mem_out = self.read_memory(frame_key) 
+                pred_obj_masks,pred_obj_logits = self.decode_mask(obj_mem_out, kf16_thin, kf8, kf4)
+
+
+            assert self.get_new_objs or self.has_memory , "first frame empty!"
+            if self.get_new_objs and self.has_memory:
+                obj_masks = torch.cat([pred_obj_masks,new_obj_masks])
+                obj_logits = torch.cat([pred_obj_logits,new_obj_logits])
+            elif self.get_new_objs:
+                obj_masks, obj_logits = new_obj_masks, new_obj_logits
+            elif self.has_memory:
+                obj_masks, obj_logits = pred_obj_masks,pred_obj_logits
+
+            obj_mem_in = self.encode_value(image,kf16,obj_masks)
+            self.add_memory(frame_key,obj_mem_in,obj_masks)
+
+            if return_loss:
+                if i == 0 : 
+                    continue
+                gt_masks = torch.stack([
+                    cls_gt[i] == label
+                    for i,label in self.mem_objs
+                ])
+                ti,tu = compute_tensor_iu(obj_masks > 0.5, gt_masks)
+                total_i += ti.detach().cpu()
+                total_u += tu.detach().cpu()
+                loss = loss  +  self.loss_fn(obj_logits,cls_gt,self.mem_objs,data_batch['_iter'])
+            else:
+                # todo
+                batch_masks.append(obj_masks.detach().cpu())
+
+        
+        if return_loss:
+            return { 'loss':loss,
+                'p' : self.loss_fn.p,
+                'num_samples':B,
+                'iou' : total_i / total_u }
+        else:
+            return {
+                'pred_masks': batch_masks,
+                ** data_batch
+            }
+
+    def train_step(self,data_batch,optimizer,**kw):
+
+        # data to cuda
+        for k, v in data_batch.items():
+            if type(v) != list and type(v) != dict and type(v) != int:
+                data_batch[k] = v.cuda(non_blocking=True)
+        output = self.forward(return_loss=True,_iter=kw['_iter'],**data_batch)
+        loss = output['loss']
+        return {
+            'loss':loss,
+            'log_vars':{
+                'loss':loss.detach().cpu(),
+                'iou': output['iou'],
+                'p': output['p']
+            },
+            'num_samples' : output['num_samples']
+        }
+            
+
+    def val_step(self,data_batch,**kw):
+        return self.train_step(data_batch,optimizer=None,**kw)
+
+
     def encode_key(self, frame): 
         # input: b*c*h*w
         b = frame.shape[0]
@@ -81,14 +188,21 @@ class STCNModel(nn.Module):
 
         return k16, f16_thin, f16, f8, f4
 
+    @property
+    def broadcast_map(self):
+        return [i for i,l in self.mem_objs]
+    @property
+    def has_memory(self):
+        return len(self.mem_objs) > 0
+
     def encode_value(self,image,kf16,obj_masks):
         ii = self.broadcast_map # broadcast B,C,H,W to N,C,H,W ,from B frames to N objects
-        obj_mem_values = self.value_encoder(image[ii],kf16[ii],obj_masks.unsqueeze(1))
-        return obj_mem_values
+        obj_mem_in = self.value_encoder(image[ii],kf16[ii],obj_masks.unsqueeze(1))
+        return obj_mem_in
 
-    def decode_mask(self,obj_read_values,kf16_thin, kf8, kf4):
+    def decode_mask(self,obj_mem_out,kf16_thin, kf8, kf4):
         ii = self.broadcast_map # broadcast B,C,H,W to N,C,H,W ,from B frames to N objects
-        obj_mask_value = torch.cat([obj_read_values, kf16_thin[ii]],dim=1)
+        obj_mask_value = torch.cat([obj_mem_out, kf16_thin[ii]],dim=1)
         logits = self.mask_decoder(obj_mask_value,kf8[ii],kf4[ii]).squeeze(1)
         prob_ = torch.sigmoid(logits)
         new_prob = torch.zeros_like(prob_)
@@ -97,7 +211,6 @@ class STCNModel(nn.Module):
             new_prob[objs] = prob_[objs]
             new_prob[bg] = torch.prod(1-new_prob[objs],dim=0,keepdim=False).clamp(1e-7, 1-1e-7)
 
-
         logits = torch.log(new_prob / (1 - new_prob))
         prob = torch.empty_like(new_prob)
         for obj_per_frame in self.aggregate_map:
@@ -105,53 +218,21 @@ class STCNModel(nn.Module):
 
         return prob,logits
 
-    def init_memory(self,cls_gt,obj_labels):
-        B,H,W = cls_gt.shape
-        # for i,labels in obj_labels:
-        #     labels.remove(0) # remove background
-        obj_masks = torch.stack([
-                cls_gt[i] == label 
-                for i,labels in obj_labels
-                for label in labels
-        ])
-        N = obj_masks.shape[0]
-        broadcast_map = [
-                i
-                for i,labels in obj_labels
-                for label in labels
-        ]
-
-        aggregate_map = []
-        k = 0
-        for i,labels in obj_labels:
-            obj = []
-            for j in labels:
-                obj.append(k)
-                k += 1
-            aggregate_map.append(obj)
-
-        
-        self.B = B
-        self.N = N
-        self.H = H
-        self.W = W
-        self.broadcast_map = broadcast_map
-        self.aggregate_map = aggregate_map
-        self.obj_labels = obj_labels
-        self._memory_has_init = False # see self.add_memory
-        
-        return obj_masks # N,H,W
-
     def add_memory(self,key,value,mask):
-        if self._memory_has_init:
-            self.mem_keys = torch.cat([self.mem_keys, key.unsqueeze(2)],dim=2)
-            self.mem_values = torch.cat([self.mem_values, value.unsqueeze(2)],dim=2)
-            self.mem_masks = torch.cat([self.mem_masks, mask.unsqueeze(0)],dim=0)
-        else:
+        if not self.has_memory:
             self.mem_keys = key.unsqueeze(2) # B,C,T,H,W
+        else:
+            self.mem_keys = torch.cat([self.mem_keys, key.unsqueeze(2)],dim=2)
+            
+        if not self.has_memory:
             self.mem_values = value.unsqueeze(2) # N,C,T,H,W
-            self.mem_masks = mask.unsqueeze(0) # N,H,W
-            self._memory_has_init = True
+        elif not self.get_new_objs:
+            self.mem_values = torch.cat([self.mem_values, value.unsqueeze(2)],dim=2)
+        else:
+            new_N,C,H,W = value.shape
+            N,C,T,H,W = self.mem_values.shape
+            self.mem_values = F.pad(self.mem_values,(0,0,0,0,0,0,0,0,new_N - N,0))
+            self.mem_values = torch.cat([self.mem_values, value.unsqueeze(2)],dim=2)
 
     def read_memory(self,qk):
         # qk:B,C,H,W
@@ -180,95 +261,6 @@ class STCNModel(nn.Module):
         N, CV, T, H, W = mv.shape
 
         mo = mv.view(N, CV, T*H*W) 
-        obj_read_values = torch.bmm(mo, obj_affinity) # N, CV, HW
-        obj_read_values = obj_read_values.view(N, CV, H, W)
-        return obj_read_values
-
-    def forward(self,return_loss=False,**data_batch):
-        assert 'rgb' in data_batch
-        assert 'cls_gt' in data_batch
-        assert len(data_batch['rgb'].shape) == 5, "rgb must be a (B,T,3,H,W) Tensor"
-        assert len(data_batch['cls_gt'].shape) == 4, "cls_gt must be a (B,t,H,W) int Tensor"
-
-        if return_loss:
-            loss = 0
-            total_i = 0
-            total_u = 1
-        else:
-            batch_masks = []
-
-        B,T,C,H,W = data_batch['rgb'].shape
-        obj_labels_w_bg = [[idx,x.unique().tolist()] for idx,x in enumerate(data_batch['cls_gt'])]
-
-        for i in range(T):
-            image = data_batch['rgb'][:,i] # B,3,H,W ,默认所有Tensor都是 B,C,H,W
-            frame_key, kf16_thin, kf16, kf8, kf4  = self.encode_key(image)
-            if i == 0: # todo, always first frame as ref frame 
-                cls_gt = data_batch['cls_gt'][:,i] # B,H,W
-                obj_masks = self.init_memory(cls_gt, obj_labels_w_bg)
-            else:
-                obj_read_values = self.read_memory(frame_key) 
-                obj_masks,obj_logits = self.decode_mask(obj_read_values, kf16_thin, kf8, kf4)
-
-            obj_mem_values = self.encode_value(image,kf16,obj_masks)
-            self.add_memory(frame_key,obj_mem_values,obj_masks)
-
-            if return_loss:
-                if i == 0 : 
-                    continue
-                cls_gt = data_batch['cls_gt'][:,i] # B,H,W \dtype int
-                gt_mask = self.split_masks(cls_gt)
-                ti,tu = compute_tensor_iu(obj_logits > 0.5, gt_mask > 0.5)
-                total_i += ti.detach().cpu()
-                total_u += tu.detach().cpu()
-                if '_iter' in data_batch:
-                    it = data_batch['_iter']
-                else:
-                    it = 0
-                loss = loss  +  self.loss_fn(obj_masks,cls_gt,self.aggregate_map,it)
-            else:
-                # todo
-                batch_masks.append(obj_masks.detach().cpu())
-
-        
-        if return_loss:
-            return { 'loss':loss,
-                'p' : self.loss_fn.p,
-                'num_samples':B,
-                'iou' : total_i / total_u }
-        else:
-            return {
-                'pred_masks': batch_masks,
-                ** data_batch
-            }
-
-
-    def train_step(self,data_batch,optimizer,**kw):
-        # data to cuda
-        for k, v in data_batch.items():
-            if type(v) != list and type(v) != dict and type(v) != int:
-                data_batch[k] = v.cuda(non_blocking=True)
-        output = self.forward(return_loss=True,_iter=kw['_iter'],**data_batch)
-        loss = output['loss']
-        return {
-            'loss':loss,
-            'log_vars':{
-                'loss':loss.detach().cpu(),
-                'iou': output['iou'],
-                'p': output['p']
-            },
-            'num_samples' : output['num_samples']
-        }
-            
-    def val_step(self,data_batch,**kw):
-        return self.train_step(data_batch,optimizer=None,**kw)
-
-
-    def split_masks(self, cls_gt):
-        obj_labels = self.obj_labels
-        obj_masks = torch.stack([
-                cls_gt[i] == label 
-                for i,labels in obj_labels
-                for label in labels
-        ])
-        return obj_masks
+        obj_mem_out = torch.bmm(mo, obj_affinity) # N, CV, HW
+        obj_mem_out = obj_mem_out.view(N, CV, H, W)
+        return obj_mem_out
