@@ -30,7 +30,7 @@ class HyperParameters():
         parser.add_argument('--gamma', help='LR := LR*gamma at every decay step', default=0.1, type=float)
 
         # Loading
-        parser.add_argument('--load_network', help='Path to pretrained network weight only')
+        parser.add_argument('--load_network', help='Path to pretrained network weight only', default= None)
         parser.add_argument('--load_model', help='Path to the model file, including network, optimizer and such', default=None)
 
         # Logging information

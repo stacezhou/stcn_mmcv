@@ -55,26 +55,27 @@ runner = IterBasedRunner(
     exp_id=para['id'],
     log_interval=10,
     checkpoint_interval=5000,
+    load_network=para['load_network'],
     resume_model=para['load_model']
 )
 runner.run(
     [   renew_dataloader(stage=0,batch_size=8),
         renew_dataloader(stage=0,batch_size=8,val=True) 
     ],
-    [ ('train',500), ('val',30), 
+    [ ('train',500), ('val',50), 
     ],
     iters=300000
 )
 
-all_iters = 15000
+all_iters = 150000
 skip = [10,15,20,25,5]
-skip_fraction = [0.1, 0.1, 0.1, 0.1, 0.4, 0.2]
+skip_fraction = [0.1, 0.1, 0.1, 0.4, 0.2]
 for skip,skip_fraction in zip(skip,skip_fraction):
     runner.run(
         [   renew_dataloader(stage=3,max_skip=skip,batch_size=4),
             renew_dataloader(stage=3,max_skip=skip,batch_size=4,val=True),
         ],
-        [ ('train',500), ('train',30) 
+        [ ('train',500), ('val',50) 
         ],
         iters=all_iters * skip_fraction
     )

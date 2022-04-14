@@ -13,6 +13,7 @@ class BootstrappedCE(nn.Module):
         self.start_warm = start_warm
         self.end_warm = end_warm
         self.top_p = top_p
+        self.this_p = 0
 
     def forward(self, input, target, it):
         if it < self.start_warm:
@@ -26,7 +27,8 @@ class BootstrappedCE(nn.Module):
         else:
             this_p = self.top_p + (1-self.top_p)*((self.end_warm-it)/(self.end_warm-self.start_warm))
         loss, _ = torch.topk(raw_loss, int(num_pixels * this_p), sorted=False)
-        return loss.mean(), this_p
+        self.this_p = this_p
+        return loss.mean()
     
 class LossComputer(nn.Module):
     def __init__(self):
@@ -34,16 +36,20 @@ class LossComputer(nn.Module):
         self.bce = BootstrappedCE()
 
     def forward(self, output, it=0):
-        losses = defaultdict(int)
+        loss = 0
         pred_logits = output['pred_logits']
         cls_gt = output['cls_gt']
         obj_map = output['obj_map']
         for i,per_frame in enumerate(obj_map):
             c_gt = cls_gt[i].unsqueeze(0)
             logits = pred_logits[per_frame].unsqueeze(0)
-            losses['total_loss'] = losses['total_loss'] + self.bce(logits,c_gt,it)[0]
-        
-        return losses
+            loss += self.bce(logits,c_gt,it)[0]
+
+        return loss
+    
+    @property
+    def p(self):
+        return self.bce.this_p
 
 class STCNModel(nn.Module):
 
@@ -181,70 +187,83 @@ class STCNModel(nn.Module):
         obj_read_values = obj_read_values.view(N, CV, H, W)
         return obj_read_values
 
-    def forward(self,current_frame=dict(),return_loss=True,**data):
-        if len(current_frame) == 0 and len(data) != 0 and return_loss == False:
-            return self.train_step(data,None,return_loss=False)
+    def forward(self,return_loss=False,**data_batch):
+        assert 'rgb' in data_batch
+        assert 'cls_gt' in data_batch
+        assert len(data_batch['rgb'].shape) == 4, "rgb must be a (B,T,3,H,W) Tensor"
+        assert len(data_batch['cls_gt'].shape) == 4, "cls_gt must be a (B,t,H,W) int Tensor"
 
-        image = current_frame['rgb'] 
-        frame_key, kf16_thin, kf16, kf8, kf4  = self.encode_key(image)
-        # 除非特殊说明，所有Tensor的维度都是 B,C,H,W
-        if current_frame['is_ref']:
-            cls_gt = current_frame['cls_gt'] # B,H,W
-            obj_logits = None
-            obj_masks = self.init_memory(cls_gt, current_frame['obj_labels_w_bg'])
-        else:
-            obj_read_values = self.read_memory(frame_key) 
-            obj_masks,obj_logits = self.decode_mask(obj_read_values, kf16_thin, kf8, kf4)
-        obj_mem_values = self.encode_value(image,kf16,obj_masks)
-        self.add_memory(frame_key,obj_mem_values,obj_masks)
-        return {
-            'pred_mask':obj_masks,
-            'pred_logits':obj_logits,
-            'gt_mask':self.split_masks(current_frame['cls_gt']),
-            'obj_map':self.aggregate_map,
-            **current_frame
-        }
-
-    def train_step(self,data,optimizer,return_loss=True):
-        B,T,C,H,W = data['rgb'].shape
-        for k, v in data.items():
+        # data to cuda
+        for k, v in data_batch.items():
             if type(v) != list and type(v) != dict and type(v) != int:
-                data[k] = v.cuda(non_blocking=True)
-        loss = 0
-        total_i = 0
-        total_u = 1
+                data_batch[k] = v.cuda(non_blocking=True)
+
+        if return_loss:
+            loss = 0
+            total_i = 0
+            total_u = 1
+        else:
+            batch_masks = []
+            batch_logits = []
+
+        B,T,C,H,W = data_batch['rgb'].shape
+        obj_labels_w_bg = [[idx,x.unique().tolist()] for idx,x in enumerate(data_batch['cls_gt'])]
+
         for i in range(T):
-            currents_frame = {
-                'rgb':data['rgb'][:,i],  # B,3,H,W
-                'cls_gt':data['cls_gt'][:,i], # B,H,W \in 0,1,2...
-                'name':data['info']['name'],
-                # 'frames': [x[i] for x in data['info']['frames']],
-                'is_ref': True if i == 0 else False,
-                'obj_labels_w_bg': [[idx,x.unique().tolist()] for idx,x in enumerate(data['cls_gt'])]
+            image = data_batch['rgb'][:,i] # B,3,H,W ,默认所有Tensor都是 B,C,H,W
+            frame_key, kf16_thin, kf16, kf8, kf4  = self.encode_key(image)
+            if i == 0: # todo, always first frame as ref frame 
+                cls_gt = data_batch['cls_gt'][:,i] # B,H,W
+                obj_masks = self.init_memory(cls_gt, obj_labels_w_bg)
+            else:
+                obj_read_values = self.read_memory(frame_key) 
+                obj_masks,obj_logits = self.decode_mask(obj_read_values, kf16_thin, kf8, kf4)
+
+            obj_mem_values = self.encode_value(image,kf16,obj_masks)
+            self.add_memory(frame_key,obj_mem_values,obj_masks)
+
+            if return_loss and i != 0:
+                cls_gt = data_batch['cls_gt'][:,i] # B,H,W \dtype int
+                gt_mask = self.split_masks(cls_gt)
+                ti,tu = compute_tensor_iu(obj_logits > 0.5, gt_mask > 0.5)
+                total_i += ti.detach().cpu()
+                total_u += tu.detach().cpu()
+                loss = loss  +  self.loss_fn(obj_masks,cls_gt,self.aggregate_map)
+            else:
+                # todo
+                batch_masks.append(obj_masks.detach().cpu())
+                batch_logits.append(obj_logits.detach().cpu())
+
+        
+        if return_loss:
+            return { 'loss':loss,
+                'p' : self.loss_fn.p,
+                'num_samples':B,
+                'iou' : total_i / total_u }
+        else:
+            return {
+                'pred_masks': batch_masks,
+                'pred_logits': batch_logits,
+                ** data_batch
             }
-            output = self.forward(currents_frame)
-            if output['is_ref']:
-                continue
-            ti,tu = compute_tensor_iu(output['pred_logits'] > 0.5, output['gt_mask'] > 0.5)
-            total_i += ti.detach().cpu()
-            total_u += tu.detach().cpu()
-            loss = loss  +  self.loss_fn(output)['total_loss']
 
-        if return_loss == False:
-            return [(total_i / total_u).cpu().numpy().tolist()] * B
 
+    def train_step(self,data_batch,optimizer,**kw):
+        output = self.forward(data_batch,return_loss=True)
+        loss = output['loss']
         return {
             'loss':loss,
             'log_vars':{
                 'loss':loss.detach().cpu(),
-                'iou': total_i / total_u
+                'iou': output['iou'],
+                'p': output['p']
             },
-            'num_samples' : B
+            'num_samples' : output['num_samples']
         }
             
-    def val_step(self,data,optimizer):
-        pass
-    
+    def val_step(self,data_batch,**kw):
+        return self.train_step(data_batch)
+
     def split_masks(self, cls_gt):
         obj_labels = self.obj_labels
         obj_masks = torch.stack([

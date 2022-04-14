@@ -18,6 +18,7 @@ class EpochBasedRunner(_EpochBasedRunner):
             checkpoint_config = None,
             log_config = None,
             log_interval = None,
+            load_network = None,
             resume_model = None
             ):
         if exp_id is not None:
@@ -57,6 +58,9 @@ class EpochBasedRunner(_EpochBasedRunner):
         )
 
         self.register_hook(DistSamplerSeedHook())
+
+        if load_network is not None:
+            self.load_checkpoint(load_network)
         if resume_model is not None:
             self.resume(resume_model)
 
@@ -79,6 +83,7 @@ class IterBasedRunner(_IterBasedRunner):
             checkpoint_config = None,
             log_config = None,
             log_interval = None,
+            load_network=None,
             resume_model=None
             ):
         if exp_id is not None:
@@ -116,6 +121,8 @@ class IterBasedRunner(_IterBasedRunner):
             checkpoint_config=checkpoint_config,
             log_config=log_config,
         )
+        if load_network is not None:
+            self.load_checkpoint(load_network)
 
         if resume_model is not None:
             self.resume(resume_model)
