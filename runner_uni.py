@@ -68,7 +68,7 @@ class EpochBasedRunner(_EpochBasedRunner):
         if epochs is not None:
             max_epochs = self.epoch + epochs
 
-        super().run(self, data_loaders, workflow, max_epochs, **kwargs)
+        super().run(data_loaders, workflow, max_epochs, **kwargs)
 
 class IterBasedRunner(_IterBasedRunner):
 
@@ -131,4 +131,4 @@ class IterBasedRunner(_IterBasedRunner):
         if iters is not None:
             max_iters = self.iter + iters
 
-        super().run(self, data_loaders, workflow, max_iters, **kwargs)
+        super().run(data_loaders, workflow, max_iters, **kwargs)

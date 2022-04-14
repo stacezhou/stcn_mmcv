@@ -12,7 +12,7 @@ from util.load_subset import load_sub_davis, load_sub_yv
 # Parse command line arguments
 para = HyperParameters()
 para.parse()
-
+print(para)
 static_root = path.expanduser(para['static_root'])
 yv_root = path.join(path.expanduser(para['yv_root']), 'train_480p')
 davis_root = path.join(path.expanduser(para['davis_root']), '2017', 'trainval')
@@ -21,13 +21,13 @@ bl_root = path.join(path.expanduser(para['bl_root']))
 skip_values = [10, 15, 20, 25, 5]
 
 def get_dataset(stage=3,max_skip=5,val=False):
-    print('Renewed with skip: ', max_skip)
     if val == True:
         if stage != 0:
             yv_dataset = VOSDataset(path.join(yv_root, 'JPEGImages'), 
                                 path.join(yv_root, 'Annotations'), max_skip//5, is_bl=False,val=True, subset=load_sub_yv())
             davis_dataset = VOSDataset(path.join(davis_root, 'JPEGImages', '480p'), 
                                 path.join(davis_root, 'Annotations', '480p'), max_skip, is_bl=False,val=True, subset=load_sub_davis())
+            print('Renewed with skip: ', max_skip)
             eval_dataset = ConcatDataset([davis_dataset]*5 + [yv_dataset])
             return eval_dataset
 
@@ -64,6 +64,7 @@ def get_dataset(stage=3,max_skip=5,val=False):
                             path.join(davis_root, 'Annotations', '480p'), max_skip, is_bl=False, subset=load_sub_davis())
         train_dataset = ConcatDataset([davis_dataset]*5 + [yv_dataset])
 
+        print('Renewed with skip: ', max_skip)
         print('YouTube dataset size: ', len(yv_dataset))
         print('DAVIS dataset size: ', len(davis_dataset))
         print('Concat dataset size: ', len(train_dataset))

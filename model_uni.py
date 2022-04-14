@@ -35,11 +35,8 @@ class LossComputer(nn.Module):
         super().__init__()
         self.bce = BootstrappedCE()
 
-    def forward(self, output, it=0):
+    def forward(self, pred_logits,cls_gt,obj_map, it=0):
         loss = 0
-        pred_logits = output['pred_logits']
-        cls_gt = output['cls_gt']
-        obj_map = output['obj_map']
         for i,per_frame in enumerate(obj_map):
             c_gt = cls_gt[i].unsqueeze(0)
             logits = pred_logits[per_frame].unsqueeze(0)
@@ -190,7 +187,7 @@ class STCNModel(nn.Module):
     def forward(self,return_loss=False,**data_batch):
         assert 'rgb' in data_batch
         assert 'cls_gt' in data_batch
-        assert len(data_batch['rgb'].shape) == 4, "rgb must be a (B,T,3,H,W) Tensor"
+        assert len(data_batch['rgb'].shape) == 5, "rgb must be a (B,T,3,H,W) Tensor"
         assert len(data_batch['cls_gt'].shape) == 4, "cls_gt must be a (B,t,H,W) int Tensor"
 
         # data to cuda
@@ -204,7 +201,6 @@ class STCNModel(nn.Module):
             total_u = 1
         else:
             batch_masks = []
-            batch_logits = []
 
         B,T,C,H,W = data_batch['rgb'].shape
         obj_labels_w_bg = [[idx,x.unique().tolist()] for idx,x in enumerate(data_batch['cls_gt'])]
@@ -222,17 +218,22 @@ class STCNModel(nn.Module):
             obj_mem_values = self.encode_value(image,kf16,obj_masks)
             self.add_memory(frame_key,obj_mem_values,obj_masks)
 
-            if return_loss and i != 0:
+            if return_loss:
+                if i == 0 : 
+                    continue
                 cls_gt = data_batch['cls_gt'][:,i] # B,H,W \dtype int
                 gt_mask = self.split_masks(cls_gt)
                 ti,tu = compute_tensor_iu(obj_logits > 0.5, gt_mask > 0.5)
                 total_i += ti.detach().cpu()
                 total_u += tu.detach().cpu()
-                loss = loss  +  self.loss_fn(obj_masks,cls_gt,self.aggregate_map)
+                if 'iter' in data_batch:
+                    it = data_batch['it']
+                else:
+                    it = 0
+                loss = loss  +  self.loss_fn(obj_masks,cls_gt,self.aggregate_map,it)
             else:
                 # todo
                 batch_masks.append(obj_masks.detach().cpu())
-                batch_logits.append(obj_logits.detach().cpu())
 
         
         if return_loss:
@@ -243,13 +244,12 @@ class STCNModel(nn.Module):
         else:
             return {
                 'pred_masks': batch_masks,
-                'pred_logits': batch_logits,
                 ** data_batch
             }
 
 
     def train_step(self,data_batch,optimizer,**kw):
-        output = self.forward(data_batch,return_loss=True)
+        output = self.forward(return_loss=True,**data_batch)
         loss = output['loss']
         return {
             'loss':loss,

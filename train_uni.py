@@ -36,9 +36,9 @@ else:
     init_seeds(14159265 + local_rank*100)
 
 ####### dataloader
-def renew_dataloader(**kw):
+def renew_dataloader(batch_size=4,**kw):
     dataset = get_dataset(**kw)
-    return get_dataloader(dataset,world_size,local_rank)
+    return get_dataloader(dataset,world_size,local_rank,batch_size=batch_size)
 
 ####### model
 stcn_model = STCNModel().cuda()
@@ -47,38 +47,46 @@ if world_size > 1:
 
 ####### runner
 optimizer = optim.Adam(filter(lambda p: p.requires_grad, stcn_model.parameters()), lr=para['lr'], weight_decay=1e-7)
-
 runner = IterBasedRunner(
     model = stcn_model,
     optimizer=optimizer,
-    lr_config={'policy':'step','step':[150000],'gamma':0.1},
+    lr_config={'policy':'step','step':para['steps'],'gamma':para['gamma']},
     exp_id=para['id'],
     log_interval=10,
     checkpoint_interval=5000,
     load_network=para['load_network'],
-    resume_model=para['load_model']
-)
-runner.run(
-    [   renew_dataloader(stage=0,batch_size=8),
-        renew_dataloader(stage=0,batch_size=8,val=True) 
-    ],
-    [ ('train',500), ('val',50), 
-    ],
-    iters=300000
+    resume_model=para['load_model'],
+    amp=para['amp']
+
 )
 
-all_iters = 150000
-skip = [10,15,20,25,5]
-skip_fraction = [0.1, 0.1, 0.1, 0.4, 0.2]
-for skip,skip_fraction in zip(skip,skip_fraction):
+batch_size = para['batch_size']
+if para['stage'] == 0:
     runner.run(
-        [   renew_dataloader(stage=3,max_skip=skip,batch_size=4),
-            renew_dataloader(stage=3,max_skip=skip,batch_size=4,val=True),
+        [   # data_loaders
+            renew_dataloader(stage=0,batch_size=batch_size),
+            renew_dataloader(stage=0,batch_size=batch_size,val=True) 
         ],
-        [ ('train',500), ('val',50) 
+        [ 
+            ('train',500),  # model.train_step(**data_batch) for data_batch in data_loader
+            ('val',50),  # model.val_step(**data_batch) for data_batch in data_loader
         ],
-        iters=all_iters * skip_fraction
+        iters=para['iterations']
     )
+
+elif para['stage'] == 3:
+    all_iters = para['iterations']
+    skip = [10,15,20,25,5]
+    skip_fraction = [0.1, 0.1, 0.1, 0.4, 0.2]
+    for skip,skip_fraction in zip(skip,skip_fraction):
+        runner.run(
+            [   renew_dataloader(stage=3,max_skip=skip,batch_size=batch_size),
+                renew_dataloader(stage=3,max_skip=skip,batch_size=batch_size,val=True),
+            ],
+            [ ('train',500), ('val',50) 
+            ],
+            iters=all_iters * skip_fraction
+        )
 
 if world_size > 1:
     dist.destroy_process_group()
