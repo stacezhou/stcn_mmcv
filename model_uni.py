@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from collections import defaultdict
 import math
 from util.tensor_util import compute_tensor_iu
 from model.modules import ValueEncoder,ValueEncoderSO,KeyEncoder,KeyProjection,Decoder
@@ -35,9 +34,9 @@ class LossComputer(nn.Module):
         super().__init__()
         self.bce = BootstrappedCE()
 
-    def forward(self, pred_logits,cls_gt,objs, it=0):
+    def forward(self, pred_logits,cls_gt,a_map, it=0):
         loss = 0
-        for per_frame,(i,label) in enumerate(objs):
+        for i,per_frame in enumerate(a_map):
             c_gt = cls_gt[i].unsqueeze(0)
             logits = pred_logits[per_frame].unsqueeze(0)
             loss += self.bce(logits,c_gt,it)[0]
@@ -77,6 +76,7 @@ class STCNModel(nn.Module):
         B,T,C,H,W = data_batch['rgb'].shape
         if 'reset_memory' not in data_batch or data_batch['reset_memory']:
             self.mem_objs = []
+            self.mem_keys = None
         # 每一个样本(共B个)，含有哪些目标
         for i in range(T):
             image = data_batch['rgb'][:,i] # B,3,H,W ,默认所有Tensor都是 B,C,H,W
@@ -86,13 +86,12 @@ class STCNModel(nn.Module):
             this_objs = [
                 (i,l) 
                 for i,x in enumerate(cls_gt)
-                for l in x.unique()
+                for l in x.unique().tolist()
             ]
-            new_objs = list(set(this_objs) - set(self.mem_objs))
+            new_objs = sorted(list(set(this_objs) - set(self.mem_objs)))
             self.get_new_objs = len(new_objs) > 0
             if self.get_new_objs:
                 # update object ids & map
-                self.mem_objs.extend(new_objs)
                 new_obj_masks = torch.stack([
                     cls_gt[i] == label
                     for i,label in new_objs
@@ -107,7 +106,6 @@ class STCNModel(nn.Module):
                 pred_obj_masks,pred_obj_logits = self.decode_mask(obj_mem_out, kf16_thin, kf8, kf4)
 
 
-            assert self.get_new_objs or self.has_memory , "first frame empty!"
             if self.get_new_objs and self.has_memory:
                 obj_masks = torch.cat([pred_obj_masks,new_obj_masks])
                 obj_logits = torch.cat([pred_obj_logits,new_obj_logits])
@@ -115,9 +113,11 @@ class STCNModel(nn.Module):
                 obj_masks, obj_logits = new_obj_masks, new_obj_logits
             elif self.has_memory:
                 obj_masks, obj_logits = pred_obj_masks,pred_obj_logits
+            self.mem_objs.extend(new_objs)
+
 
             obj_mem_in = self.encode_value(image,kf16,obj_masks)
-            self.add_memory(frame_key,obj_mem_in,obj_masks)
+            self.add_memory(frame_key,obj_mem_in)
 
             if return_loss:
                 if i == 0 : 
@@ -127,9 +127,9 @@ class STCNModel(nn.Module):
                     for i,label in self.mem_objs
                 ])
                 ti,tu = compute_tensor_iu(obj_masks > 0.5, gt_masks)
-                total_i += ti.detach().cpu()
-                total_u += tu.detach().cpu()
-                loss = loss  +  self.loss_fn(obj_logits,cls_gt,self.mem_objs,data_batch['_iter'])
+                total_i += ti.tolist()
+                total_u += tu.tolist()
+                loss = loss  +  self.loss_fn(obj_logits,cls_gt,self.aggregate_map,data_batch['_iter'])
             else:
                 # todo
                 batch_masks.append(obj_masks.detach().cpu())
@@ -190,7 +190,17 @@ class STCNModel(nn.Module):
 
     @property
     def broadcast_map(self):
+        # [0,0,1,1,2,2,3,3,1] -> 9 objs , 4 image
         return [i for i,l in self.mem_objs]
+    @property
+    def aggregate_map(self):
+        # [[0,1],[2,3,8],[4,5],[6,7]] -> 9 objs, 4 image
+        B = len(set(self.broadcast_map))
+        a_map = [[]]*B
+        for oi,fi in enumerate(self.broadcast_map):
+            a_map[fi].append(oi)
+        return a_map
+
     @property
     def has_memory(self):
         return len(self.mem_objs) > 0
@@ -214,25 +224,20 @@ class STCNModel(nn.Module):
         logits = torch.log(new_prob / (1 - new_prob))
         prob = torch.empty_like(new_prob)
         for obj_per_frame in self.aggregate_map:
-            prob[obj_per_frame] = F.log_softmax(logits[obj_per_frame],dim=0)
+            prob[obj_per_frame] = F.softmax(logits[obj_per_frame],dim=0)
 
         return prob,logits
 
-    def add_memory(self,key,value,mask):
-        if not self.has_memory:
+    def add_memory(self,key,value):
+        if self.mem_keys is None:
             self.mem_keys = key.unsqueeze(2) # B,C,T,H,W
-        else:
-            self.mem_keys = torch.cat([self.mem_keys, key.unsqueeze(2)],dim=2)
-            
-        if not self.has_memory:
             self.mem_values = value.unsqueeze(2) # N,C,T,H,W
-        elif not self.get_new_objs:
-            self.mem_values = torch.cat([self.mem_values, value.unsqueeze(2)],dim=2)
         else:
             new_N,C,H,W = value.shape
             N,C,T,H,W = self.mem_values.shape
             self.mem_values = F.pad(self.mem_values,(0,0,0,0,0,0,0,0,new_N - N,0))
             self.mem_values = torch.cat([self.mem_values, value.unsqueeze(2)],dim=2)
+            self.mem_keys = torch.cat([self.mem_keys, key.unsqueeze(2)],dim=2)
 
     def read_memory(self,qk):
         # qk:B,C,H,W

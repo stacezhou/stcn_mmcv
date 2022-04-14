@@ -2,7 +2,6 @@ from model_uni import STCNModel
 from runner_uni import EpochBasedRunner,IterBasedRunner
 import torch.distributed as dist
 from mmcv.parallel import MMDistributedDataParallel as DDP
-from hooks_uni import EvalHook,DistEvalHook
 import torch.optim as optim
 import torch
 import numpy as np
