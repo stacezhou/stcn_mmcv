@@ -5,6 +5,37 @@ from mmcv.runner.hooks import Fp16OptimizerHook
 from mmcv.utils import get_logger
 from mmcv.parallel import MMDistributedDataParallel as DDP
 from mmcv.runner import DistSamplerSeedHook
+from mmcv.runner.hooks import TensorboardLoggerHook as _TensorboardLoggerHook
+from mmcv.runner.hooks import TextLoggerHook as _TextLoggerHook
+class TensorboardLoggerHook(_TensorboardLoggerHook):
+    def after_val_iter(self, runner):
+        if not self.by_epoch and self.every_n_inner_iters(runner, self.interval):
+            runner.log_buffer.average(self.interval)
+        elif self.by_epoch and self.every_n_iters(runner, self.interval):
+            runner.log_buffer.average(self.interval)
+        elif self.end_of_epoch(runner) and not self.ignore_last:
+            # not precise but more stable
+            runner.log_buffer.average(self.interval)
+
+        if runner.log_buffer.ready:
+            self.log(runner)
+            if self.reset_flag:
+                runner.log_buffer.clear_output()
+
+class TextLoggerHook(_TextLoggerHook):
+    def after_val_iter(self, runner):
+        if not self.by_epoch and self.every_n_inner_iters(runner, self.interval):
+            runner.log_buffer.average(self.interval)
+        elif self.by_epoch and self.every_n_iters(runner, self.interval):
+            runner.log_buffer.average(self.interval)
+        elif self.end_of_epoch(runner) and not self.ignore_last:
+            # not precise but more stable
+            runner.log_buffer.average(self.interval)
+
+        if runner.log_buffer.ready:
+            self.log(runner)
+            if self.reset_flag:
+                runner.log_buffer.clear_output()
 
 class EpochBasedRunner(_EpochBasedRunner):
     def __init__(self, model, lr_config,
@@ -105,9 +136,14 @@ class IterBasedRunner(_IterBasedRunner):
             checkpoint_config = dict(interval = checkpoint_interval)
 
         if log_config is None and isinstance(log_interval, int):
-            log_config = dict(interval= log_interval,
-                hooks=[dict(type='TextLoggerHook'),dict(type='TensorboardLoggerHook')
-                ])
+            self.register_hook(
+                TensorboardLoggerHook(interval=log_interval,by_epoch=False),
+                priority='VERY_LOW'
+            )
+            self.register_hook(
+                TextLoggerHook(interval=log_interval,by_epoch=False),
+                priority='VERY_LOW'
+            )
         
         if optimizer_config is None:
             if amp:
@@ -131,4 +167,5 @@ class IterBasedRunner(_IterBasedRunner):
         if iters is not None:
             max_iters = self.iter + iters
 
-        super().run(data_loaders, workflow, max_iters, **kwargs)
+        _iter = self.iter
+        super().run(data_loaders, workflow, max_iters,_iter=_iter, **kwargs)

@@ -12,7 +12,6 @@ from util.load_subset import load_sub_davis, load_sub_yv
 # Parse command line arguments
 para = HyperParameters()
 para.parse()
-print(para)
 static_root = path.expanduser(para['static_root'])
 yv_root = path.join(path.expanduser(para['yv_root']), 'train_480p')
 davis_root = path.join(path.expanduser(para['davis_root']), '2017', 'trainval')

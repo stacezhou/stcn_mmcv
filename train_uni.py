@@ -35,6 +35,9 @@ else:
     torch.cuda.set_device(local_rank)
     init_seeds(14159265 + local_rank*100)
 
+if local_rank == 0:
+    print(para)
+
 ####### dataloader
 def renew_dataloader(batch_size=4,**kw):
     dataset = get_dataset(**kw)
@@ -52,7 +55,7 @@ runner = IterBasedRunner(
     optimizer=optimizer,
     lr_config={'policy':'step','step':para['steps'],'gamma':para['gamma']},
     exp_id=para['id'],
-    log_interval=10,
+    log_interval=50,
     checkpoint_interval=5000,
     load_network=para['load_network'],
     resume_model=para['load_model'],
@@ -64,12 +67,12 @@ batch_size = para['batch_size']
 if para['stage'] == 0:
     runner.run(
         [   # data_loaders
+            renew_dataloader(stage=0,batch_size=batch_size,val=True),
             renew_dataloader(stage=0,batch_size=batch_size),
-            renew_dataloader(stage=0,batch_size=batch_size,val=True) 
         ],
         [ 
-            ('train',500),  # model.train_step(**data_batch) for data_batch in data_loader
             ('val',50),  # model.val_step(**data_batch) for data_batch in data_loader
+            ('train',500),  # model.train_step(**data_batch) for data_batch in data_loader
         ],
         iters=para['iterations']
     )
@@ -80,10 +83,13 @@ elif para['stage'] == 3:
     skip_fraction = [0.1, 0.1, 0.1, 0.4, 0.2]
     for skip,skip_fraction in zip(skip,skip_fraction):
         runner.run(
-            [   renew_dataloader(stage=3,max_skip=skip,batch_size=batch_size),
+            [   
                 renew_dataloader(stage=3,max_skip=skip,batch_size=batch_size,val=True),
+                renew_dataloader(stage=3,max_skip=skip,batch_size=batch_size),
             ],
-            [ ('train',500), ('val',50) 
+            [ 
+                ('val',50) ,
+                ('train',500), 
             ],
             iters=all_iters * skip_fraction
         )

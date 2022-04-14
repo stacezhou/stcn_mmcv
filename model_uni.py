@@ -190,11 +190,6 @@ class STCNModel(nn.Module):
         assert len(data_batch['rgb'].shape) == 5, "rgb must be a (B,T,3,H,W) Tensor"
         assert len(data_batch['cls_gt'].shape) == 4, "cls_gt must be a (B,t,H,W) int Tensor"
 
-        # data to cuda
-        for k, v in data_batch.items():
-            if type(v) != list and type(v) != dict and type(v) != int:
-                data_batch[k] = v.cuda(non_blocking=True)
-
         if return_loss:
             loss = 0
             total_i = 0
@@ -226,8 +221,8 @@ class STCNModel(nn.Module):
                 ti,tu = compute_tensor_iu(obj_logits > 0.5, gt_mask > 0.5)
                 total_i += ti.detach().cpu()
                 total_u += tu.detach().cpu()
-                if 'iter' in data_batch:
-                    it = data_batch['it']
+                if '_iter' in data_batch:
+                    it = data_batch['_iter']
                 else:
                     it = 0
                 loss = loss  +  self.loss_fn(obj_masks,cls_gt,self.aggregate_map,it)
@@ -249,7 +244,11 @@ class STCNModel(nn.Module):
 
 
     def train_step(self,data_batch,optimizer,**kw):
-        output = self.forward(return_loss=True,**data_batch)
+        # data to cuda
+        for k, v in data_batch.items():
+            if type(v) != list and type(v) != dict and type(v) != int:
+                data_batch[k] = v.cuda(non_blocking=True)
+        output = self.forward(return_loss=True,_iter=kw['_iter'],**data_batch)
         loss = output['loss']
         return {
             'loss':loss,
@@ -262,7 +261,8 @@ class STCNModel(nn.Module):
         }
             
     def val_step(self,data_batch,**kw):
-        return self.train_step(data_batch)
+        return self.train_step(data_batch,optimizer=None,**kw)
+
 
     def split_masks(self, cls_gt):
         obj_labels = self.obj_labels
