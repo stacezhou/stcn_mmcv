@@ -20,15 +20,15 @@ bl_root = path.join(path.expanduser(para['bl_root']))
 
 skip_values = [10, 15, 20, 25, 5]
 
-def get_dataset(stage=3,max_skip=5,valset=False,sec=False):
+def get_dataset(stage=3,max_skip=5,val=False):
     print('Renewed with skip: ', max_skip)
-    if valset == True:
+    if val == True:
         if stage != 0:
             yv_dataset = VOSDataset(path.join(yv_root, 'JPEGImages'), 
                                 path.join(yv_root, 'Annotations'), max_skip//5, is_bl=False,val=True, subset=load_sub_yv())
             davis_dataset = VOSDataset(path.join(davis_root, 'JPEGImages', '480p'), 
                                 path.join(davis_root, 'Annotations', '480p'), max_skip, is_bl=False,val=True, subset=load_sub_davis())
-            eval_dataset = ConcatDataset([davis_dataset]*25 + [yv_dataset]*5)
+            eval_dataset = ConcatDataset([davis_dataset]*5 + [yv_dataset])
             return eval_dataset
 
         else:
@@ -37,29 +37,18 @@ def get_dataset(stage=3,max_skip=5,valset=False,sec=False):
 
 
     if stage == 0:
-        if sec:
-            fss_dataset = StaticTransformDataset(path.join(static_root, 'fss'), method=0)
-            big_dataset = StaticTransformDataset(path.join(static_root, 'BIG_small'), method=1)
-            hrsod_dataset = StaticTransformDataset(path.join(static_root, 'HRSOD_small'), method=1)
+        fss_dataset = StaticTransformDataset(path.join(static_root, 'fss'), method=0)
+        duts_tr_dataset = StaticTransformDataset(path.join(static_root, 'DUTS-TR'), method=1)
+        ecssd_dataset = StaticTransformDataset(path.join(static_root, 'ecssd'), method=1)
+        big_dataset = StaticTransformDataset(path.join(static_root, 'BIG_small'), method=1)
+        hrsod_dataset = StaticTransformDataset(path.join(static_root, 'HRSOD_small'), method=1)
 
-            # BIG and HRSOD have higher quality, use them more
-            train_dataset = ConcatDataset([fss_dataset]
-                    + [big_dataset, hrsod_dataset]*5)
+        # BIG and HRSOD have higher quality, use them more
+        train_dataset = ConcatDataset([fss_dataset,duts_tr_dataset,ecssd_dataset]
+                + [big_dataset, hrsod_dataset]*5)
 
-            print('Static dataset split 1 size: ', len(train_dataset))
-            return train_dataset
-        else:
-            duts_tr_dataset = StaticTransformDataset(path.join(static_root, 'DUTS-TR'), method=1)
-            ecssd_dataset = StaticTransformDataset(path.join(static_root, 'ecssd'), method=1)
-            big_dataset = StaticTransformDataset(path.join(static_root, 'BIG_small'), method=1)
-            hrsod_dataset = StaticTransformDataset(path.join(static_root, 'HRSOD_small'), method=1)
-
-            # BIG and HRSOD have higher quality, use them more
-            train_dataset = ConcatDataset([duts_tr_dataset,ecssd_dataset]
-                    + [big_dataset, hrsod_dataset]*6)
-
-            print('Static dataset split 2 size: ', len(train_dataset))
-            return train_dataset
+        print('Static dataset size: ', len(train_dataset))
+        return train_dataset
         
 
     elif stage == 1:
@@ -73,20 +62,18 @@ def get_dataset(stage=3,max_skip=5,valset=False,sec=False):
                             path.join(yv_root, 'Annotations'), max_skip//5, is_bl=False, subset=load_sub_yv())
         davis_dataset = VOSDataset(path.join(davis_root, 'JPEGImages', '480p'), 
                             path.join(davis_root, 'Annotations', '480p'), max_skip, is_bl=False, subset=load_sub_davis())
-        train_dataset = ConcatDataset([davis_dataset]*400 + [yv_dataset]*80)
+        train_dataset = ConcatDataset([davis_dataset]*5 + [yv_dataset])
 
         print('YouTube dataset size: ', len(yv_dataset))
         print('DAVIS dataset size: ', len(davis_dataset))
         print('Concat dataset size: ', len(train_dataset))
         return train_dataset
 
-increase_skip_fraction = [0.1, 0.2, 0.3, 0.4, 0.8, 1.0]
 
 def worker_init_fn(worker_id,local_rank): 
     return np.random.seed(torch.initial_seed()%(2**31) + worker_id + local_rank*100)
 
-def get_dataloader(dataset,world_size,local_rank=0,**kw):
-    batch_size = 4
+def get_dataloader(dataset,world_size,local_rank=0,batch_size=4,**kw):
     if world_size > 1:
         train_sampler = DistributedSampler(dataset, rank=local_rank,shuffle=True)
         data_loader = DataLoader(dataset,batch_size, worker_init_fn=lambda wi:worker_init_fn(wi,local_rank),
