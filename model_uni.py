@@ -126,7 +126,8 @@ class STCNModel(nn.Module):
                     cls_gt[i] == label
                     for i,label in self.mem_objs
                 ])
-                ti,tu = compute_tensor_iu(obj_masks > 0.5, gt_masks)
+                non_bg = [i for i,label in self.mem_objs if label != 0]
+                ti,tu = compute_tensor_iu(obj_masks[non_bg] > 0.5, gt_masks[non_bg])
                 total_i += ti.tolist()
                 total_u += tu.tolist()
                 loss = loss  +  self.loss_fn(obj_logits,cls_gt,self.aggregate_map,data_batch['_iter'])

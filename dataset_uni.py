@@ -19,7 +19,10 @@ bl_root = path.join(path.expanduser(para['bl_root']))
 
 skip_values = [10, 15, 20, 25, 5]
 
-def get_dataset(stage=3,max_skip=5,val=False):
+def get_dataset(stage=3,max_skip=5,val=False,debug=False):
+    if debug==True:
+        return StaticTransformDataset(path.join(static_root, 'ecssd'), method=1)
+
     if val == True:
         if stage != 0:
             yv_dataset = VOSDataset(path.join(yv_root, 'JPEGImages'), 

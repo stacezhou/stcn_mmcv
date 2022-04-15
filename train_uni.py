@@ -54,7 +54,7 @@ runner = IterBasedRunner(
     optimizer=optimizer,
     lr_config={'policy':'step','step':para['steps'],'gamma':para['gamma']},
     exp_id=para['id'],
-    log_interval=50,
+    log_interval=5,
     checkpoint_interval=5000,
     load_network=para['load_network'],
     resume_model=para['load_model'],
@@ -92,6 +92,19 @@ elif para['stage'] == 3:
             ],
             iters=all_iters * skip_fraction
         )
+elif para['stage'] == 1:
+    # debug
+    runner.run(
+        [
+            renew_dataloader(debug=True),
+            renew_dataloader(debug=True),
+        ],
+        [
+            ('train',500),
+            ('val',50),
+        ],
+        iters=100000
+    )
 
 if world_size > 1:
     dist.destroy_process_group()
