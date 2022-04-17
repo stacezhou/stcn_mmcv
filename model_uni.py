@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 from util.tensor_util import compute_tensor_iu
-from model.modules import ValueEncoder,ValueEncoderSO,KeyEncoder,KeyProjection,Decoder
+from model.modules import ValueEncoderSO,KeyEncoder,KeyProjection,Decoder
 
 class BootstrappedCE(nn.Module):
     def __init__(self, start_warm=20000, end_warm=70000, top_p=0.15):
@@ -63,49 +63,59 @@ class STCNModel(nn.Module):
         self.mem_objs = [] # (No.frame, cls_label)
     
     def forward(self,return_loss=False,**data_batch):
-        assert 'rgb' in data_batch
-        assert 'cls_gt' in data_batch
+        assert 'rgb' in data_batch # B,T,3,H,W
+        assert 'cls_gt' in data_batch # B,T,H,W
 
+        # 测试时没有 gt，没法计算 loss 
         if return_loss:
             loss = 0
             total_i = 0
             total_u = 1
         else:
-            batch_masks = []
+            out_masks = []
 
-        B,T,C,H,W = data_batch['rgb'].shape
+
+        # 默认一个 batch 清空 memory
         if 'reset_memory' not in data_batch or data_batch['reset_memory']:
             self.mem_objs = []
             self.mem_keys = None
-        # 每一个样本(共B个)，含有哪些目标
+
+
+        # 按时间依次处理 Batch 内各帧
+        B,T,C,H,W = data_batch['rgb'].shape
         for i in range(T):
-            image = data_batch['rgb'][:,i] # B,3,H,W ,默认所有Tensor都是 B,C,H,W
+
+            image = data_batch['rgb'][:,i] # B,3,H,W 
             cls_gt = data_batch['cls_gt'][:,i] # B,H,W
 
-            # 出现了新的目标 gt
+
+            # 出现了新的目标: 一般只在第一帧，Youtube 后续帧也会出现新目标
             this_objs = [
-                (i,l) 
-                for i,x in enumerate(cls_gt)
-                for l in x.unique().tolist()
+                (img_id,obj_label) 
+                for img_id,frame_gt in enumerate(cls_gt)
+                for obj_label in frame_gt.unique().tolist() 
             ]
             new_objs = sorted(list(set(this_objs) - set(self.mem_objs)))
             self.get_new_objs = len(new_objs) > 0
             if self.get_new_objs:
-                # update object ids & map
+                # 从 cls_gt 得到每个 object 的 mask
                 new_obj_masks = torch.stack([
                     cls_gt[i] == label
                     for i,label in new_objs
                 ])
                 _new_obj_prob = new_obj_masks.float().clamp(1e-7, 1-1e-7)
+                # 以及相应的 logtis, 主要用于 Youtube 时和预测 object 统一
                 new_obj_logits = torch.log(_new_obj_prob / (1 - _new_obj_prob))
 
-            # 预测目标
+
+            #######################! 预测目标  ############################
             frame_key, kf16_thin, kf16, kf8, kf4  = self.encode_key(image)
             if self.has_memory:
                 obj_mem_out = self.read_memory(frame_key) 
                 pred_obj_masks,pred_obj_logits = self.decode_mask(obj_mem_out, kf16_thin, kf8, kf4)
 
 
+            # 组合新gt目标和预测目标
             if self.get_new_objs and self.has_memory:
                 obj_masks = torch.cat([pred_obj_masks,new_obj_masks])
                 obj_logits = torch.cat([pred_obj_logits,new_obj_logits])
@@ -116,26 +126,38 @@ class STCNModel(nn.Module):
             self.mem_objs.extend(new_objs)
 
 
+            ########################! 存记忆   ############################
             obj_mem_in = self.encode_value(image,kf16,obj_masks)
             self.add_memory(frame_key,obj_mem_in)
 
+
+            # obj_masks = F.interpolate(obj_masks, (H,W), mode='bilinear', align_corners=False)
+            # cls_pred = torch.argmax(obj_masks, dim=0)
+            # 计算 Loss 或者 直接返回预测结果
             if return_loss:
                 if i == 0 : 
                     continue
+                loss = loss  +  self.loss_fn(obj_logits,cls_gt,self.aggregate_map,data_batch['_iter'])
+
                 gt_masks = torch.stack([
                     cls_gt[i] == label
                     for i,label in self.mem_objs
                 ])
+                # 不计算背景的 iou
                 non_bg = [i for i,label in self.mem_objs if label != 0]
-                ti,tu = compute_tensor_iu(obj_masks[non_bg] > 0.5, gt_masks[non_bg])
+                test_masks = torch.empty_like(obj_masks)
+                for obj_per_frame in self.aggregate_map:
+                    pass
+                ti,tu = compute_tensor_iu(test_masks,  gt_masks[non_bg])
                 total_i += ti.tolist()
                 total_u += tu.tolist()
-                loss = loss  +  self.loss_fn(obj_logits,cls_gt,self.aggregate_map,data_batch['_iter'])
             else:
                 # todo
-                batch_masks.append(obj_masks.detach().cpu())
+                out_masks = (out_masks.detach().cpu().numpy()[:,0]).astype(np.uint8)
+                out_masks.append(obj_masks.detach().cpu())
 
         
+        # 计算 Loss 或者 直接返回预测结果
         if return_loss:
             return { 'loss':loss,
                 'p' : self.loss_fn.p,
@@ -143,7 +165,7 @@ class STCNModel(nn.Module):
                 'iou' : total_i / total_u }
         else:
             return {
-                'pred_masks': batch_masks,
+                'pred_masks': out_masks,
                 ** data_batch
             }
 
@@ -153,20 +175,25 @@ class STCNModel(nn.Module):
         for k, v in data_batch.items():
             if type(v) != list and type(v) != dict and type(v) != int:
                 data_batch[k] = v.cuda(non_blocking=True)
+
         output = self.forward(return_loss=True,_iter=kw['_iter'],**data_batch)
         loss = output['loss']
         return {
+            # train_step 时，此处回传的 loss 会自动调用 backward
             'loss':loss,
-            'log_vars':{
+            # log vars 会被记录
+            'log_vars':{ 
                 'loss':loss.detach().cpu(),
                 'iou': output['iou'],
                 'p': output['p']
             },
+            # 用于对 log vars 计算平均时加权
             'num_samples' : output['num_samples']
         }
             
 
     def val_step(self,data_batch,**kw):
+        # val_step 不会记录梯度
         return self.train_step(data_batch,optimizer=None,**kw)
 
 
@@ -215,7 +242,9 @@ class STCNModel(nn.Module):
         ii = self.broadcast_map # broadcast B,C,H,W to N,C,H,W ,from B frames to N objects
         obj_mask_value = torch.cat([obj_mem_out, kf16_thin[ii]],dim=1)
         logits = self.mask_decoder(obj_mask_value,kf8[ii],kf4[ii]).squeeze(1)
+
         prob_ = torch.sigmoid(logits)
+
         new_prob = torch.zeros_like(prob_)
         for obj_per_frame in self.aggregate_map:
             bg,*objs = obj_per_frame
@@ -223,6 +252,7 @@ class STCNModel(nn.Module):
             new_prob[bg] = torch.prod(1-new_prob[objs],dim=0,keepdim=False).clamp(1e-7, 1-1e-7)
 
         logits = torch.log(new_prob / (1 - new_prob))
+
         prob = torch.empty_like(new_prob)
         for obj_per_frame in self.aggregate_map:
             prob[obj_per_frame] = F.softmax(logits[obj_per_frame],dim=0)
@@ -230,6 +260,7 @@ class STCNModel(nn.Module):
         return prob,logits
 
     def add_memory(self,key,value):
+
         if self.mem_keys is None:
             self.mem_keys = key.unsqueeze(2) # B,C,T,H,W
             self.mem_values = value.unsqueeze(2) # N,C,T,H,W
