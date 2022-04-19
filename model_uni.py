@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 import math
 from util.tensor_util import compute_tensor_iu
 from model.modules import ValueEncoderSO,KeyEncoder,KeyProjection,Decoder
@@ -144,11 +145,12 @@ class STCNModel(nn.Module):
                     for i,label in self.mem_objs
                 ])
                 # 不计算背景的 iou
-                non_bg = [i for i,label in self.mem_objs if label != 0]
-                test_masks = torch.empty_like(obj_masks)
-                for obj_per_frame in self.aggregate_map:
-                    pass
-                ti,tu = compute_tensor_iu(test_masks,  gt_masks[non_bg])
+                # non_bg = [i for i,label in self.mem_objs if label != 0]
+                # test_masks = torch.empty_like(obj_masks)
+                # for obj_per_frame in self.aggregate_map:
+                #     pass
+                # ti,tu = compute_tensor_iu(test_masks,  gt_masks[non_bg])
+                ti,tu = compute_tensor_iu(obj_masks > 0.4,  gt_masks)
                 total_i += ti.tolist()
                 total_u += tu.tolist()
             else:

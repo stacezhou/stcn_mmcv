@@ -71,7 +71,7 @@ if para['stage'] == 0:
         ],
         [ 
             ('val',50),  # model.val_step(**data_batch) for data_batch in data_loader
-            ('train',500),  # model.train_step(**data_batch) for data_batch in data_loader
+            ('train',2000),  # model.train_step(**data_batch) for data_batch in data_loader
         ],
         iters=para['iterations']
     )
@@ -88,7 +88,7 @@ elif para['stage'] == 3:
             ],
             [ 
                 ('val',50) ,
-                ('train',500), 
+                ('train',2000), 
             ],
             iters=all_iters * skip_fraction
         )

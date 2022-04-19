@@ -22,7 +22,7 @@ class HyperParameters():
         parser.add_argument('--num_workers', help='Number of datalaoder workers per process', type=int, default=8)
 
         # Generic learning parameters
-        parser.add_argument('-b', '--batch_size', help='Default is dependent on the training stage, see below', default=4, type=int)
+        parser.add_argument('-b', '--batch_size', help='Default is dependent on the training stage, see below',  type=int)
         parser.add_argument('-i', '--iterations', help='Default is dependent on the training stage, see below', default=None, type=int)
         parser.add_argument('--steps', help='Default is dependent on the training stage, see below', nargs="*", default=None, type=int)
 
