@@ -3,6 +3,7 @@ saves/
 .vscode/
 tmp
 work_dir
+__*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
