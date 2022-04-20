@@ -84,6 +84,7 @@ class InferenceCore:
             for oi in self.enabled_obj], 0)
 
             out_mask = aggregate(out_mask, keep_bg=True)
+            out_mask = yield out_mask
             self.prob[0,ti] = out_mask[0]
             for i, oi in enumerate(self.enabled_obj):
                 self.prob[oi,ti] = out_mask[i+1]
@@ -120,4 +121,4 @@ class InferenceCore:
         key_k = key_k.unsqueeze(2)
 
         # Propagate
-        self.do_pass(key_k, key_v, frame_idx, end_idx)
+        yield from self.do_pass(key_k, key_v, frame_idx, end_idx)

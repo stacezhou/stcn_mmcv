@@ -29,6 +29,7 @@ from util.tensor_util import unpad
 from inference_core_yv import InferenceCore
 
 from progressbar import progressbar
+from multi_scale_utils import MultiScaleTest
 
 """
 Arguments loading
@@ -50,6 +51,7 @@ parser.add_argument('--top', type=int, default=20)
 parser.add_argument('--amp', action='store_true')
 parser.add_argument('--mem_every', default=5, type=int)
 parser.add_argument('--include_last', help='include last frame as temporary memory?', action='store_true')
+parser.add_argument('--scales',nargs='+',type=float,default=[1])
 args = parser.parse_args()
 
 yv_path = args.yv_path
@@ -114,10 +116,11 @@ for data in progressbar(test_loader, max_value=len(test_loader), redirect_stdout
 
         # Frames with labels, but they are not exhaustively labeled
         frames_with_gt = sorted(list(gt_obj.keys()))
-
-        processor = InferenceCore(prop_model, rgb, num_objects=num_objects, top_k=top_k, 
+        ms = MultiScaleTest(size, args.scales)
+        processores = [InferenceCore(prop_model, rgb, num_objects=num_objects, top_k=top_k, 
                                     mem_every=args.mem_every, include_last=args.include_last, 
                                     req_frames=req_frames)
+                    for rgb in ms.scales(rgb,'bicubic') ]
         # min_idx tells us the starting point of propagation
         # Propagating before there are labels is not useful
         min_idx = 99999
@@ -135,11 +138,17 @@ for data in progressbar(test_loader, max_value=len(test_loader), redirect_stdout
             ], 0).cuda()
 
             # We perform propagation from the current frame to the next frame with label
+            # for processor,with_bg_msk in zip(processores,resize(with_bg_msk,scales)):
             if i == len(frames_with_gt) - 1:
+                gen_out_mask_list = [
                 processor.interact(with_bg_msk, frame_idx, rgb.shape[1], obj_idx)
+                for processor,with_bg_msk in zip(processores,ms.scales(with_bg_msk)) ]
             else:
+                gen_out_mask_list = [
                 processor.interact(with_bg_msk, frame_idx, frames_with_gt[i+1]+1, obj_idx)
-
+                for processor,with_bg_msk in zip(processores,ms.scales(with_bg_msk)) ]
+            ms.interact(gen_out_mask_list)
+        processor = processores[0]
         # Do unpad -> upsample to original size (we made it 480p)
         out_masks = torch.zeros((processor.t, 1, *size), dtype=torch.uint8, device='cuda')
 
