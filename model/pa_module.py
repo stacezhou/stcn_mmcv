@@ -418,6 +418,7 @@ class PA_module(nn.Module):
         self.backbone.init_weights(pretrained)
 
     def forward(self,img):
-        x = self.backbone(img)
-        pred_pa = self.classifier(x)
+        with torch.no_grad():
+            x = self.backbone(img)
+            pred_pa = self.classifier(x)
         return pred_pa

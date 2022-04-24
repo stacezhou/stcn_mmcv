@@ -24,14 +24,17 @@ class Decoder(nn.Module):
         self.up_16_8 = UpsampleBlock(512, 512, 256) # 1/16 -> 1/8
         self.up_8_4 = UpsampleBlock(256, 256, 256) # 1/8 -> 1/4
         self.pa = PA_module()
+        for name, parameter in self.pa.named_parameters():
+            parameter.requries_grad = False
 
         self.pred = nn.Conv2d(512, 1, kernel_size=(3,3), padding=(1,1), stride=1)
 
     def forward(self, f16, f8, f4, img=None):
-        pa = self.pa(img)
         x = self.compress(f16)
         x = self.up_16_8(f8, x)
         x = self.up_8_4(f4, x)
+
+        pa = self.pa(img)
         x = torch.cat([pa,x],dim=1)
         x = self.pred(F.relu(x))
         
