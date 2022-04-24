@@ -24,6 +24,7 @@ class STCNModel:
 
         self.STCN = nn.parallel.DistributedDataParallel(
             STCN(self.single_object).cuda(), 
+            find_unused_parameters=True,
             device_ids=[local_rank], output_device=local_rank, broadcast_buffers=False)
 
         # Setup logger when local_rank=0
