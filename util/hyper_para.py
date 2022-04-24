@@ -36,6 +36,7 @@ class HyperParameters():
         # Logging information
         parser.add_argument('--id', help='Experiment UNIQUE id, use NULL to disable logging to tensorboard', default='NULL')
         parser.add_argument('--debug', help='Debug mode which logs information more often', action='store_true')
+        parser.add_argument('--load_pa')
 
         # Multiprocessing parameters, not set by users
         parser.add_argument('--local_rank', default=0, type=int, help='Local rank of this process')

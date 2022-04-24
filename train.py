@@ -15,7 +15,7 @@ from dataset.vos_dataset import VOSDataset
 from util.logger import TensorboardLogger
 from util.hyper_para import HyperParameters
 from util.load_subset import load_sub_davis, load_sub_yv
-
+from mmcv.runner import load_checkpoint
 
 """
 Initial setup
@@ -59,9 +59,11 @@ if local_rank == 0:
     model = STCNModel(para, logger=logger, 
                     save_path=path.join('saves', long_id, long_id) if long_id is not None else None, 
                     local_rank=local_rank, world_size=world_size).train()
+    load_checkpoint(model.STCN.module.decoder.pa, para['load_pa'])
 else:
     # Construct model for other ranks
     model = STCNModel(para, local_rank=local_rank, world_size=world_size).train()
+    load_checkpoint(model.STCN.module.decoder.pa, para['load_pa'])
 
 # Load pertrained model if needed
 if para['load_model'] is not None:

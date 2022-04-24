@@ -80,7 +80,7 @@ class InferenceCore:
 
             # After this step all keys will have the same size
             out_mask = torch.cat([
-                self.prop_net.segment_with_query(self.mem_banks[oi], qf8, qf4, k16, qv16)
+                self.prop_net.segment_with_query(self.mem_banks[oi], qf8, qf4, k16, qv16,img=ti)
             for oi in self.enabled_obj], 0)
 
             out_mask = aggregate(out_mask, keep_bg=True)

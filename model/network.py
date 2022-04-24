@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from model.modules import *
+from .pa_module import PA_module
 
 
 class Decoder(nn.Module):
@@ -22,14 +23,16 @@ class Decoder(nn.Module):
         self.compress = ResBlock(1024, 512)
         self.up_16_8 = UpsampleBlock(512, 512, 256) # 1/16 -> 1/8
         self.up_8_4 = UpsampleBlock(256, 256, 256) # 1/8 -> 1/4
+        self.pa = PA_module()
 
-        self.pred = nn.Conv2d(256, 1, kernel_size=(3,3), padding=(1,1), stride=1)
+        self.pred = nn.Conv2d(512, 1, kernel_size=(3,3), padding=(1,1), stride=1)
 
-    def forward(self, f16, f8, f4):
+    def forward(self, f16, f8, f4, img=None):
+        pa = self.pa(img)
         x = self.compress(f16)
         x = self.up_16_8(f8, x)
         x = self.up_8_4(f4, x)
-
+        x = torch.cat([pa,x],dim=1)
         x = self.pred(F.relu(x))
         
         x = F.interpolate(x, scale_factor=4, mode='bilinear', align_corners=False)
@@ -126,18 +129,18 @@ class STCN(nn.Module):
             f16 = self.value_encoder(frame, kf16, mask, other_mask)
         return f16.unsqueeze(2) # B*512*T*H*W
 
-    def segment(self, qk16, qv16, qf8, qf4, mk16, mv16, selector=None): 
+    def segment(self, qk16, qv16, qf8, qf4, mk16, mv16, selector=None,img=None): 
         # q - query, m - memory
         # qv16 is f16_thin above
         affinity = self.memory.get_affinity(mk16, qk16)
         
         if self.single_object:
-            logits = self.decoder(self.memory.readout(affinity, mv16, qv16), qf8, qf4)
+            logits = self.decoder(self.memory.readout(affinity, mv16, qv16), qf8, qf4,img)
             prob = torch.sigmoid(logits)
         else:
             logits = torch.cat([
-                self.decoder(self.memory.readout(affinity, mv16[:,0], qv16), qf8, qf4),
-                self.decoder(self.memory.readout(affinity, mv16[:,1], qv16), qf8, qf4),
+                self.decoder(self.memory.readout(affinity, mv16[:,0], qv16), qf8, qf4, img),
+                self.decoder(self.memory.readout(affinity, mv16[:,1], qv16), qf8, qf4, img),
             ], 1)
 
             prob = torch.sigmoid(logits)
@@ -157,5 +160,3 @@ class STCN(nn.Module):
             return self.segment(*args, **kwargs)
         else:
             raise NotImplementedError
-
-

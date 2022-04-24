@@ -27,7 +27,7 @@ from model.eval_network import STCN
 from dataset.yv_test_dataset import YouTubeVOSTestDataset
 from util.tensor_util import unpad
 from inference_core_yv import InferenceCore
-
+from mmcv.runner import load_checkpoint
 from progressbar import progressbar
 
 """
@@ -50,6 +50,7 @@ parser.add_argument('--top', type=int, default=20)
 parser.add_argument('--amp', action='store_true')
 parser.add_argument('--mem_every', default=5, type=int)
 parser.add_argument('--include_last', help='include last frame as temporary memory?', action='store_true')
+parser.add_argument('--load_pa')
 args = parser.parse_args()
 
 yv_path = args.yv_path
@@ -82,7 +83,7 @@ for k in list(prop_saved.keys()):
             pads = torch.zeros((64,1,7,7), device=prop_saved[k].device)
             prop_saved[k] = torch.cat([prop_saved[k], pads], 1)
 prop_model.load_state_dict(prop_saved)
-
+load_checkpoint(prop_model.decoder.pa, args.load_pa)
 # Start eval
 for data in progressbar(test_loader, max_value=len(test_loader), redirect_stdout=True):
 

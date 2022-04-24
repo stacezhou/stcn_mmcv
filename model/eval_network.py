@@ -55,11 +55,11 @@ class STCN(nn.Module):
 
         return k16, f16_thin, f16, f8, f4
 
-    def segment_with_query(self, mem_bank, qf8, qf4, qk16, qv16): 
+    def segment_with_query(self, mem_bank, qf8, qf4, qk16, qv16,img): 
         k = mem_bank.num_objects
 
         readout_mem = mem_bank.match_memory(qk16)
         qv16 = qv16.expand(k, -1, -1, -1)
         qv16 = torch.cat([readout_mem, qv16], 1)
 
-        return torch.sigmoid(self.decoder(qv16, qf8, qf4))
+        return torch.sigmoid(self.decoder(qv16, qf8, qf4, img))
