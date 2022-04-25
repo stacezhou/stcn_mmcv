@@ -1,5 +1,6 @@
 pipeline= [
     dict(type='LoadImageFromFile'),
+    dict(type='LoadMaskFromFile'),
 ]
 data = dict(
     type = 'StaticDataset',

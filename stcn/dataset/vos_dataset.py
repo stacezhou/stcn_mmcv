@@ -39,7 +39,7 @@ class StaticDataset(Dataset):
         data = {
             'img_prefix' : None,
             'img_info':{'filename': image},
-            'anno_info': {'masks' : mask}
+            'ann_info': {'masks' : mask}
         }
         data = self.pipeline(data)
             
