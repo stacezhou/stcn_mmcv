@@ -2,30 +2,33 @@ from torch.utils.data import Dataset
 from pathlib import Path
 from random import randint
 from mmdet.datasets import DATASETS
+from mmdet.datasets.pipelines import Compose
 
 def listdir(path):
-    return sorted([d.name for d in Path(path).iterdir()])
+    return sorted([str(d) for d in Path(path).iterdir()])
 def listfile(path, pattern):
-    return sorted([f.name for f in Path(path).glob(pattern=pattern)])
+    return sorted([str(f) for f in Path(path).glob(pattern=pattern)])
 
 @DATASETS.register_module()
 class StaticDataset(Dataset):
-    def __init__(self,  transforms, num_frames, image_mask_root=None,video_root=None):
-        assert image_mask_root is not None or video_root is not None
-        if image_mask_root is not None:
-            self.images = listfile(image_mask_root,'*.jpg')
-            self.masks = listfile(image_mask_root, '*.png')
+    def __init__(self,  transforms=[], num_frames=3, image_root=None,video_root=None):
+        assert image_root is not None or video_root is not None
+        if image_root is not None:
+            self.images = listfile(image_root,'*.jpg')
+            self.masks = listfile(image_root, '*.png')
             assert len(self.images) == len(self.masks)
         else:
             self.images = []
             self.masks = []
-            for v in listdir(video_root):
-                image_mask_root = Path(video_root) / v
-                images = listfile(image_mask_root,'*.jpg')
-                masks = listfile(image_mask_root, '*.png')
+            for image_root in listdir(video_root):
+                images = listfile(image_root,'*.jpg')
+                masks = listfile(image_root, '*.png')
                 assert len(images) == len(masks)
                 self.images += images
                 self.masks += masks
+
+        self.num_frames = num_frames
+        self.pipeline = Compose(transforms)
     
     def __len__(self):
         return len(self.images)
@@ -33,22 +36,35 @@ class StaticDataset(Dataset):
     def __getitem__(self, index):
         image = self.images[index]
         mask = self.masks[index]
+        data = {
+            'img_prefix' : None,
+            'img_info':{'filename': image},
+            'anno_info': {'masks' : mask}
+        }
+        data = self.pipeline(data)
+            
+        return data
         
 
     def __iter__(self):
         idx = randint(0,len(self)-1)
-        yield self[idx]
+        output = []
+        for i in range(self.num_frames):
+            output.append(self[idx])
+        return output
 
-
+@DATASETS.register_module()
 class VOSTrainDataset(Dataset):
-    def __init__(self, image_root, mask_root, transforms, max_skip=10, num_frames=3, min_skip=1):
+    def __init__(self, image_root, mask_root, transforms=[], max_skip=10, num_frames=3, min_skip=1):
         mask_videos = listdir(mask_root)
         image_videos = listdir(image_root)
-        self.videos = sorted(list(set(mask_videos) - set(image_videos)))
+        self.videos = sorted(list(set(mask_videos) & set(image_videos)))
         self.pipeline = transforms
         self.min_skip = min_skip
         self.max_skip = max_skip
         self.num_frames = num_frames
+        self.flex_quota = max_skip - min_skip * (num_frames - 1) - 1
+        assert self.flex_quota >= 0, 'max_skip is too small or min_skip is too big'
 
         self.frames = dict()
         for v in self.videos:
@@ -61,7 +77,17 @@ class VOSTrainDataset(Dataset):
         return len(self.videos)
     
     def _random_choose_frames(self,frame_list):
-        pass
+        assert self.num_frames < len(frame_list)
+        offset = [0]
+        flex_quota = self.flex_quota
+        for i in range(self.num_frames - 1):
+            fq = randint(0,flex_quota)
+            flex_quota -= fq
+            offset.append(offset[-1] + self.min_skip + fq)
+ 
+        start_idx = randint(0, len(frame_list) - self.max_skip - 1)
+        frames = [frame_list[start_idx + i] for i in offset]
+        return frames
 
     def __getitem__(self, index):
         v = self.videos[index]
@@ -71,6 +97,7 @@ class VOSTrainDataset(Dataset):
         return image_frames,mask_frames
 
 
+@DATASETS.register_module()
 class VOSTestDataset(Dataset):
 
     def __init__(self, image_root, ref_mask_root, gt_mask_root = None, transforms = None):
