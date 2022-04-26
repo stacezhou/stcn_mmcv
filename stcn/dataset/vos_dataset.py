@@ -4,14 +4,21 @@ from random import randint
 from mmdet.datasets import DATASETS
 from mmdet.datasets.pipelines import Compose
 
-def listdir(path):
-    return sorted([str(d) for d in Path(path).iterdir()])
-def listfile(path, pattern):
-    return sorted([str(f) for f in Path(path).glob(pattern=pattern)])
+def listdir(path, complete_path = True):
+    if complete_path:
+        return sorted([str(d) for d in Path(path).iterdir()])
+    else:
+        return sorted([str(d.name) for d in Path(path).iterdir()])
+
+def listfile(path, pattern, complete_path = True):
+    if complete_path:
+        return sorted([str(f) for f in Path(path).glob(pattern=pattern)])
+    else:
+        return sorted([str(f.name) for f in Path(path).glob(pattern=pattern)])
 
 @DATASETS.register_module()
 class StaticDataset(Dataset):
-    def __init__(self,  transforms=[], num_frames=3, image_root=None,video_root=None):
+    def __init__(self,  pipeline=[], num_frames=3, image_root=None,video_root=None):
         assert image_root is not None or video_root is not None
         if image_root is not None:
             self.images = listfile(image_root,'*.jpg')
@@ -28,7 +35,7 @@ class StaticDataset(Dataset):
                 self.masks += masks
 
         self.num_frames = num_frames
-        self.pipeline = Compose(transforms)
+        self.pipeline = Compose(pipeline)
     
     def __len__(self):
         return len(self.images)
@@ -55,11 +62,13 @@ class StaticDataset(Dataset):
 
 @DATASETS.register_module()
 class VOSTrainDataset(Dataset):
-    def __init__(self, image_root, mask_root, transforms=[], max_skip=10, num_frames=3, min_skip=1):
-        mask_videos = listdir(mask_root)
-        image_videos = listdir(image_root)
+    def __init__(self, image_root, mask_root, pipeline=[], max_skip=10, num_frames=3, min_skip=1):
+        mask_videos = listdir(mask_root, complete_path=False)
+        image_videos = listdir(image_root, complete_path=False)
         self.videos = sorted(list(set(mask_videos) & set(image_videos)))
-        self.pipeline = transforms
+
+        self.pipeline = Compose(pipeline)
+
         self.min_skip = min_skip
         self.max_skip = max_skip
         self.num_frames = num_frames
@@ -93,18 +102,27 @@ class VOSTrainDataset(Dataset):
         v = self.videos[index]
         frames = self.frames[v]
         chosen_frames = self._random_choose_frames(frames)
-        image_frames,mask_frames = zip(*chosen_frames)
-        return image_frames,mask_frames
+        data_batch = []
+        for image,mask in chosen_frames:
+            data = {
+                'img_prefix' : None,
+                'img_info':{'filename': image},
+                'ann_info': {'masks' : mask}
+            }
+            data = self.pipeline(data)
+            data_batch.append(data)
+
+        return data_batch
 
 
 @DATASETS.register_module()
 class VOSTestDataset(Dataset):
 
-    def __init__(self, image_root, ref_mask_root, gt_mask_root = None, transforms = None):
+    def __init__(self, image_root, ref_mask_root, gt_mask_root = None, pipeline = None):
         self.videos = listdir(image_root)
         self.mask_root = ref_mask_root
         self.gt_mask_root = gt_mask_root
-        self.transforms = transforms
+        self.pipeline = pipeline
         self.has_read_frames = False
 
     def read_frames(self):
