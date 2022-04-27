@@ -27,8 +27,8 @@ data = dict(
         max_skip=10,
         min_skip=1,
         pipeline = train_vos_pipeline,
-        image_root = '/data/DAVIS/2017/trainval/JPEGImages/480p',
-        mask_root = '/data/DAVIS/2017/trainval/Annotations/480p',
+        image_root = '/data/YouTube/train_480p/JPEGImages',
+        mask_root = '/data/YouTube/train_480p/Annotations',
         repeat_dataset = 5,
     ),
 )

@@ -76,8 +76,7 @@ class VOSTrainDataset(Dataset):
         self.min_skip = min_skip
         self.max_skip = max_skip
         self.num_frames = num_frames
-        self.flex_quota = max_skip - min_skip * (num_frames - 1) - 1
-        assert self.flex_quota >= 0, 'max_skip is too small or min_skip is too big'
+        self.min_length = min_skip * (num_frames -1) + 1
 
         meta_stcn = Path(image_root) / 'meta_stcn.json'
         if meta_stcn.exists():
@@ -99,6 +98,10 @@ class VOSTrainDataset(Dataset):
                     'frame_and_mask':frame_and_mask
                 }
             mmcv.dump(self.data_infos, meta_stcn)
+        
+
+        min_nums_frams = min([v['nums_frame'] for k,v in self.data_infos.items()])
+        assert min_nums_frams  > self.min_length, 'too big min_skip'
         self._set_group_flag()
         
         
@@ -122,13 +125,15 @@ class VOSTrainDataset(Dataset):
     def _random_choose_frames(self,frame_list):
         assert self.num_frames < len(frame_list)
         offset = [0]
-        flex_quota = self.flex_quota
+        flex_quota = len(frame_list) - self.min_length 
+        start_idx = randint(0, flex_quota)
+        flex_quota -= (start_idx - self.min_skip)
         for i in range(self.num_frames - 1):
-            fq = randint(0,flex_quota)
-            flex_quota -= fq
-            offset.append(offset[-1] + self.min_skip + fq)
+            plus = min(self.max_skip, flex_quota)
+            fq = randint(self.min_skip,plus) 
+            flex_quota -= (fq - self.min_skip)
+            offset.append(offset[-1] + fq)
  
-        start_idx = randint(0, len(frame_list) - self.max_skip - 1)
         frames = [frame_list[start_idx + i] for i in offset]
         return frames
 
