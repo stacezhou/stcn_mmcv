@@ -68,7 +68,7 @@ train_vos_pipeline = [
 ]
 data = dict(
     workers_per_gpu=0,
-    samples_per_gpu=2,
+    samples_per_gpu=4,
     train=dict(
         type='VOSTrainDataset',
         nums_frame=4,

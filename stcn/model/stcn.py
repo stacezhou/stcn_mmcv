@@ -44,14 +44,14 @@ class STCN(BaseModule):
         self.use_bg = seg_background
         self.targets = []
     
-    def update_targets(self, new_objs):
+    def update_targets(self, new_objs, batch_size):
         self.targets.extend(new_objs)
         
         # [0,0,1,1,2,2,3,3,1] -> 9 objs , 4 image
         fi_list=[i for i,l in self.targets]
 
         # [[0,1],[2,3,8],[4,5],[6,7]] -> 9 objs, 4 image
-        oi_groups = [[] for _ in range(len(set(fi_list)))]
+        oi_groups = [[] for _ in range(batch_size)]
         for oi,fi in enumerate(fi_list):
             oi_groups[fi].append(oi)
     
@@ -82,7 +82,7 @@ class STCN(BaseModule):
                 gt_mask[i] == label 
                 for i,label in new_objs
             ])
-            self.update_targets(new_objs)
+            self.update_targets(new_objs, gt_mask.shape[0])
         else:
             new_gt_mask = None
         return old_gt_mask, new_gt_mask
@@ -109,6 +109,8 @@ class STCN(BaseModule):
         if return_loss:
             loss = 0
             for oii in oi_groups:
+                if len(oii) == 0:
+                    continue
                 gt_prob = old_gt_mask[oii].char()
                 logits = pred_logits[oii]
                 if not self.use_bg:
