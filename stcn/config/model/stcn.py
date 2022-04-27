@@ -29,14 +29,15 @@ model = dict(
         type = 'ValueEncoder',
         backbone=dict(
             type='ResNet',
-            depth=50,
+            depth=18,
             num_stages=4,
-            out_indices=(0, 1, 2),
+            out_indices=2,
             frozen_stages=1,
             norm_cfg=dict(type='BN', requires_grad=True),
             norm_eval=True,
             style='pytorch',
-            init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
+            init_cfg=dict(type='Pretrained', 
+                    checkpoint='torchvision://resnet50')),
         feature_fusion = dict(
             type = 'FeatureFusionBlock',
             indim = 1024 + 512,
@@ -47,8 +48,5 @@ model = dict(
         type = 'MaskDecoder',
     ),
     memory = dict(type= 'AffinityMemoryBank'),
-    loss_fn = dict(
-        type = 'PASS',
-
-    ),
+    loss_fn = dict(type = 'StcnBCELoss'),
 )

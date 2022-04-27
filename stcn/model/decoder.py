@@ -1,7 +1,9 @@
 from mmcv.runner import BaseModule
+import torch
 from mmdet.models.backbones.resnet import BasicBlock
 from .stcn import VOSMODEL
 import torch.nn as nn
+import torch.nn.functional as F
 
 @VOSMODEL.register_module()
 class UpsampleBlock(BaseModule):
@@ -27,12 +29,27 @@ class MaskDecoder(BaseModule):
 
         self.pred = nn.Conv2d(256, 1, kernel_size=(3,3), padding=(1,1), stride=1)
 
-    def forward(self, f16, f8, f4):
-        x = self.compress(f16)
+    def aggregate(self, prob):
+        new_prob = torch.cat([
+            torch.prod(1-prob, dim=1, keepdim=True),
+            prob
+        ], 1).clamp(1e-7, 1-1e-7)
+        logits = torch.log((new_prob /(1-new_prob)))
+        return logits
+
+    def forward(self, V, feats):
+        f8 = feats['f8']
+        f4 = feats['f4']
+        x = self.compress(V)
         x = self.up_16_8(f8, x)
         x = self.up_8_4(f4, x)
 
         x = self.pred(F.relu(x))
         
-        x = F.interpolate(x, scale_factor=4, mode='bilinear', align_corners=False)
-        return x
+        logits = F.interpolate(x, scale_factor=4, mode='bilinear', align_corners=False)
+
+        prob = torch.sigmoid(logits)
+        logits = self.aggregate(prob)
+        prob = F.softmax(logits, dim=1)[:, 1:]
+
+        return logits, prob

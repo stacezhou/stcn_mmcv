@@ -33,9 +33,12 @@ class ValueEncoder(BaseModule):
         self.backbone = BACKBONES.build(backbone)
         self.feature_fusion = VOSMODEL.build(feature_fusion)
 
-    def forward(self, img, feats=None):
-        x = self.backbone(img)
-        x = self.feature_fusion(x, feats)
+    def forward(self, mask, feats):
+        img = feats['img']
+        f16 = feats['f16']
+        f = torch.cat([img,mask],1)
+        x = self.backbone(f)
+        x = self.feature_fusion(x, f16)
         return x
 
 @VOSMODEL.register_module()
@@ -44,7 +47,6 @@ class KeyEncoder(BaseModule):
             backbone, 
             key_proj,
             key_comp,
-            feature_fusion, 
             init_cfg=None):
         super().__init__(init_cfg)
         self.backbone = BACKBONES.build(backbone)
@@ -66,8 +68,16 @@ class KeyEncoder(BaseModule):
         f16 = f16.view(b, *f16.shape[-3:])
         f8 = f8.view(b, *f8.shape[-3:])
         f4 = f4.view(b, *f4.shape[-3:])
+        feats = {
+            'f16' : f16,
+            'f8' : f8,
+            'f4' : f4,
+            'img' : img,
+            'f16_thin' : f16_thin,
+            'K' : k16
+        }
 
-        return k16, f16_thin, f16, f8, f4
+        return k16, feats
 
 
 @VOSMODEL.register_module()

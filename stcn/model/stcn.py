@@ -9,8 +9,6 @@ VOSMODEL = Registry('vos_model')
 class STCN(BaseModule):
     def __init__(self, 
                 key_encoder,
-                key_proj,
-                key_comp,
                 value_encoder,
                 mask_decoder,
                 memory,
@@ -24,19 +22,19 @@ class STCN(BaseModule):
         self.loss_fn = loss_fn
     
     def forward(self,img, gt_mask, flag, return_loss=False,*k,**kw):
-        K, f16_thin, f16, f8, f4 = self.key_encoder(img) 
+        K, feats = self.key_encoder(img) 
         if flag == 'new_video':
             # self.memory.reset()
-            V = self.value_encoder(img, gt_mask, f16)
-            self.memory.write(K, V)
-
-        V = self.memory.read(K)
-        mask = self.mask_decoder(mask, K, f16_thin, f8, f4, V)
-        V = self.value_encoder(img, mask, f16)
+            mask = gt_mask
+            self.memory.reset()
+        else:
+            V = self.memory.read(K)
+            logits, mask = self.mask_decoder(V, feats)
+        V = self.value_encoder(mask, feats)
         self.memory.write(K, V)
 
         if return_loss:
-            loss = self.loss_fn(mask, kw['gt_mask'])
+            loss = self.loss_fn(logits, kw['gt_mask'])
             output = {'loss': loss}
         else:
             output = {'mask': mask}
@@ -66,11 +64,4 @@ class STCN(BaseModule):
         # val_step 不会记录梯度
         return self.forward(**data_batch,return_loss=False)
 
-@VOSMODEL.register_module()
-class PASS:
-    def __init__(self):
-        pass
-
-    def __call__(self,*k,**kw):
-        return (k,kw)
         
