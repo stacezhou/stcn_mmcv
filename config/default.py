@@ -19,7 +19,7 @@ train_vos_pipeline= [
     dict(type='SafeCollect', keys=['img', 'gt_mask'], ),
 ]
 data = dict(
-    workers_per_gpu = 2,
+    workers_per_gpu = 0,
     samples_per_gpu=2,
     train = dict(
         type='VOSTrainDataset',

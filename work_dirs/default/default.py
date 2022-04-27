@@ -1,6 +1,6 @@
 checkpoint_config = dict(interval=1)
 log_config = dict(
-    interval=50,
+    interval=5,
     hooks=[dict(type='TextLoggerHook'),
            dict(type='TensorboardLoggerHook')])
 dist_params = dict(backend='nccl')
@@ -66,7 +66,7 @@ train_vos_pipeline = [
     dict(type='SafeCollect', keys=['img', 'gt_mask'])
 ]
 data = dict(
-    workers_per_gpu=2,
+    workers_per_gpu=0,
     samples_per_gpu=2,
     train=dict(
         type='VOSTrainDataset',

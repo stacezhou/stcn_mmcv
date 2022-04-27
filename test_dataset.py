@@ -5,7 +5,7 @@ from mmcv import Config
 from mmcv.parallel import collate
 from torch.utils.data import DataLoader,DistributedSampler
 
-cfg = Config.fromfile('config/dataset/youtube.py')
+cfg = Config.fromfile('config/dataset/davis.py')
 
 data = DATASETS.build(cfg.data)
 def vos_collate(batchs, samples_per_gpu=1):    

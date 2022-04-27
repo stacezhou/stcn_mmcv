@@ -3,6 +3,9 @@ saves/
 .vscode/
 tmp
 work_dir
+work_dirs
+*.pkl
+*.swp
 __*
 
 # Byte-compiled / optimized / DLL files
