@@ -23,21 +23,13 @@ data = dict(
     samples_per_gpu=2,
     train = dict(
         type='VOSTrainDataset',
+        nums_frame = 4,
+        max_skip=10,
+        min_skip=1,
         pipeline = train_vos_pipeline,
         image_root = '/data/DAVIS/2017/trainval/JPEGImages/480p',
         mask_root = '/data/DAVIS/2017/trainval/Annotations/480p',
-    ),
-    val = dict(
-        type='VOSTrainDataset',
-        pipeline = train_vos_pipeline,
-        image_root = '/data/DAVIS/2017/trainval/JPEGImages/480p',
-        mask_root = '/data/DAVIS/2017/trainval/Annotations/480p',
-    ),
-    test = dict(
-        type='VOSTrainDataset',
-        pipeline = train_vos_pipeline,
-        image_root = '/data/DAVIS/2017/trainval/JPEGImages/480p',
-        mask_root = '/data/DAVIS/2017/trainval/Annotations/480p',
+        repeat_dataset = 5,
     ),
 )
 

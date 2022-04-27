@@ -1,4 +1,4 @@
-checkpoint_config = dict(interval=1)
+checkpoint_config = dict(interval=20)
 log_config = dict(
     interval=5,
     hooks=[dict(type='TextLoggerHook'),
@@ -17,6 +17,7 @@ custom_imports = dict(
 model = dict(
     type='STCN',
     init_cfg=dict(type='Kaiming', layer='Conv2d'),
+    seg_background=False,
     key_encoder=dict(
         type='KeyEncoder',
         backbone=dict(
@@ -70,6 +71,9 @@ data = dict(
     samples_per_gpu=2,
     train=dict(
         type='VOSTrainDataset',
+        nums_frame=4,
+        max_skip=10,
+        min_skip=1,
         pipeline=[
             dict(type='LoadImageFromFile'),
             dict(type='LoadMaskFromFile'),
@@ -94,61 +98,8 @@ data = dict(
             dict(type='SafeCollect', keys=['img', 'gt_mask'])
         ],
         image_root='/data/DAVIS/2017/trainval/JPEGImages/480p',
-        mask_root='/data/DAVIS/2017/trainval/Annotations/480p'),
-    val=dict(
-        type='VOSTrainDataset',
-        pipeline=[
-            dict(type='LoadImageFromFile'),
-            dict(type='LoadMaskFromFile'),
-            dict(type='MergeImgMask'),
-            dict(type='Resize', img_scale=(896, 480), keep_ratio=True),
-            dict(type='RandomFlip', flip_ratio=0.5),
-            dict(type='Pad', size_divisor=32),
-            dict(type='SplitImgMask'),
-            dict(type='ImageToTensor', keys=['gt_mask']),
-            dict(
-                type='ToDataContainer',
-                fields=({
-                    'key': 'gt_mask',
-                    'stack': True
-                }, )),
-            dict(
-                type='Normalize',
-                mean=[123.675, 116.28, 103.53],
-                std=[58.395, 57.12, 57.375],
-                to_rgb=True),
-            dict(type='DefaultFormatBundle'),
-            dict(type='SafeCollect', keys=['img', 'gt_mask'])
-        ],
-        image_root='/data/DAVIS/2017/trainval/JPEGImages/480p',
-        mask_root='/data/DAVIS/2017/trainval/Annotations/480p'),
-    test=dict(
-        type='VOSTrainDataset',
-        pipeline=[
-            dict(type='LoadImageFromFile'),
-            dict(type='LoadMaskFromFile'),
-            dict(type='MergeImgMask'),
-            dict(type='Resize', img_scale=(896, 480), keep_ratio=True),
-            dict(type='RandomFlip', flip_ratio=0.5),
-            dict(type='Pad', size_divisor=32),
-            dict(type='SplitImgMask'),
-            dict(type='ImageToTensor', keys=['gt_mask']),
-            dict(
-                type='ToDataContainer',
-                fields=({
-                    'key': 'gt_mask',
-                    'stack': True
-                }, )),
-            dict(
-                type='Normalize',
-                mean=[123.675, 116.28, 103.53],
-                std=[58.395, 57.12, 57.375],
-                to_rgb=True),
-            dict(type='DefaultFormatBundle'),
-            dict(type='SafeCollect', keys=['img', 'gt_mask'])
-        ],
-        image_root='/data/DAVIS/2017/trainval/JPEGImages/480p',
-        mask_root='/data/DAVIS/2017/trainval/Annotations/480p'))
+        mask_root='/data/DAVIS/2017/trainval/Annotations/480p',
+        repeat_dataset=5))
 optimizer = dict(type='Adam', lr=0.0005)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 lr_config = dict(

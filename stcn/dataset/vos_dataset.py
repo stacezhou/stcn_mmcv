@@ -65,12 +65,13 @@ class StaticDataset(Dataset):
 
 @DATASETS.register_module()
 class VOSTrainDataset(Dataset):
-    def __init__(self, image_root, mask_root, pipeline=[], max_skip=10, num_frames=3, min_skip=1, test_mode=False, **kw):
+    def __init__(self, image_root, mask_root, pipeline=[],repeat_dataset = 1, max_skip=10, num_frames=3, min_skip=1, test_mode=False, **kw):
         mask_videos = listdir(mask_root, complete_path=False)
         image_videos = listdir(image_root, complete_path=False)
         self.videos = sorted(list(set(mask_videos) & set(image_videos)))
 
         self.pipeline = Compose(pipeline)
+        self.repeat = repeat_dataset
 
         self.min_skip = min_skip
         self.max_skip = max_skip
@@ -83,6 +84,7 @@ class VOSTrainDataset(Dataset):
             self.data_infos = mmcv.load(str(meta_stcn))
         else:
             self.data_infos = dict()
+            # todo video target nums meta
             for v in self.videos:
                 mask_frames = listfile(Path(mask_root) / v, '*.png')
                 image_frames = listfile(Path(image_root) / v, '*.jpg')
@@ -115,7 +117,7 @@ class VOSTrainDataset(Dataset):
                 self.flag[i] = 1
         
     def __len__(self):
-        return len(self.videos)
+        return int(len(self.videos) * self.repeat)
     
     def _random_choose_frames(self,frame_list):
         assert self.num_frames < len(frame_list)
@@ -131,6 +133,7 @@ class VOSTrainDataset(Dataset):
         return frames
 
     def __getitem__(self, index):
+        index = index % len(self.videos)
         v = self.videos[index]
         frames = self.data_infos[v]['frame_and_mask']
         chosen_frames = self._random_choose_frames(frames)

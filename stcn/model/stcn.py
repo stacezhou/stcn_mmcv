@@ -16,6 +16,15 @@ def safe_torch_cat(TensorList, *k, **kw):
     else:
         return None
 
+def compute_bg_prob(prob_wo_bg):
+    return torch.prod(1 - prob_wo_bg, dim=0, keepdim=True)
+
+def compute_bg_logits(logits_wo_bg):
+    prob_wo_bg = torch.sigmoid(logits_wo_bg)
+    prob_bg = compute_bg_prob(prob_wo_bg).clamp(1e-7, 1-1e-7)
+    logits_bg = torch.log(prob_bg / (1 - prob_bg))
+    return logits_bg
+
 @VOSMODEL.register_module()
 class STCN(BaseModule):
     def __init__(self, 
@@ -24,6 +33,7 @@ class STCN(BaseModule):
                 mask_decoder,
                 memory,
                 loss_fn,
+                seg_background = False,
                 init_cfg=None):
         super().__init__(init_cfg)
         self.key_encoder = VOSMODEL.build(key_encoder)
@@ -31,6 +41,7 @@ class STCN(BaseModule):
         self.mask_decoder = VOSMODEL.build(mask_decoder)
         self.memory = VOSMODEL.build(memory)
         self.loss_fn = LOSSES.build(loss_fn)
+        self.use_bg = seg_background
         self.targets = []
     
     def update_targets(self, new_objs):
@@ -55,6 +66,7 @@ class STCN(BaseModule):
             (fi,label) 
             for fi,frame_gt in enumerate(gt_mask)
             for label in frame_gt.unique().tolist() 
+            if label != 0 or self.use_bg
         ]
         new_objs = sorted(list(set(this_objs) - set(self.targets)))
 
@@ -82,14 +94,12 @@ class STCN(BaseModule):
             self.targets = []
             self.oi_groups = []
             pred_mask = None
-            pred_logits = None
         else:
             # 先预测
             V = self.memory.read(K)
             pred_logits, pred_mask = self.mask_decoder(V, feats, self.fi_list)
 
         # 然后增加新 GT
-
         oi_groups = self.oi_groups.copy()
         old_gt_mask, new_gt_mask = self.parse_targets(gt_mask)
         mask = safe_torch_cat([pred_mask, new_gt_mask],dim=0)
@@ -98,14 +108,21 @@ class STCN(BaseModule):
 
         if return_loss:
             loss = 0
-            for i,oii in enumerate(oi_groups):
-                cls_gt = torch.topk(
-                    old_gt_mask[oii].char(), 
-                    k = 1, 
-                    dim=0)[1].squeeze(0)
-                logits = pred_logits[oii].swapaxes(0,1)
-                loss += self.loss_fn(logits, cls_gt)
-            output = {'loss': loss}
+            for oii in oi_groups:
+                gt_prob = old_gt_mask[oii].char()
+                logits = pred_logits[oii]
+                if not self.use_bg:
+                    bg_prob = compute_bg_prob(gt_prob)
+                    gt_prob = torch.cat([bg_prob, gt_prob], dim=0)
+                    bg_logits = compute_bg_logits(logits)
+                    logits = torch.cat([bg_logits, logits], dim=0)
+
+                cls_gt = torch.topk(gt_prob,1,dim=0)[1].squeeze(0)
+                loss += self.loss_fn(logits.swapaxes(0,1), cls_gt)
+            output = {
+                'loss': loss,
+                'nums_frame': len(oi_groups),
+                }
         else:
             output = {'mask': mask}
 
@@ -125,11 +142,13 @@ class STCN(BaseModule):
                     )
 
         loss = sum([item['loss'] for key,item in output.items()])
+        nums_frame = sum([item['nums_frame'] for key,item in output.items()])
         return {
             'loss' : loss,
-            'num_samples': len(data_batch) * img.shape[0],
+            'num_samples': nums_frame,
             'log_vars' : {
                 'loss' : loss.detach().cpu(),
+                'mem_num_objs' : self.memory.gate.shape[0],
             }
         }
 

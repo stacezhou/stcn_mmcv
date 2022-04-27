@@ -6,6 +6,7 @@ custom_imports = dict(
 model = dict(
     type = 'STCN',
     init_cfg = dict(type='Kaiming', layer='Conv2d'),
+    seg_background = False,
     key_encoder = dict(
         type = 'KeyEncoder',
         backbone = dict(
