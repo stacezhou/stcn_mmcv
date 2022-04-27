@@ -18,24 +18,25 @@ class AffinityMemoryBank():
 
     def read(self, K):
         Ks = self.Ks.flatten(start_dim=2) # B,C,THW
-        Vs = self.Vs.flatten(start_dim=2)
         K = K.flatten(start_dim=2) #B,C,HW
 
         # See supplementary material
         a_sq = Ks.pow(2).sum(1).unsqueeze(2) # B,THW,1
         ab = Ks.transpose(1, 2) @ K # B,THW,HW
         frame_affinity = (2*ab-a_sq) / math.sqrt(Ks.shape[1])   # B, THW, HW
+        # del Ks, K
         
         # softmax operation; aligned the evaluation style
         maxes = torch.max(frame_affinity, dim=1, keepdim=True)[0]
         x_exp = torch.exp(frame_affinity - maxes)
         x_exp_sum = torch.sum(x_exp, dim=1, keepdim=True)
         frame_affinity = x_exp / x_exp_sum  # B,THW,HW
-        del maxes,x_exp,x_exp_sum,ab,a_sq,mk,qk # save memory
+        # del maxes,x_exp,x_exp_sum,ab,a_sq # save memory
 
         obj_affinity = frame_affinity[self.ii] # N,THW,HW
-        del frame_affinity
+        # del frame_affinity
 
+        Vs = self.Vs.flatten(start_dim=2)
         V = torch.bmm(Vs, obj_affinity).view_as(self.Vs[:,:,0])
         return V
 

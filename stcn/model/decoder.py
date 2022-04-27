@@ -21,9 +21,10 @@ class UpsampleBlock(BaseModule):
 
 @VOSMODEL.register_module()
 class MaskDecoder(BaseModule):
-    def __init__(self):
+    def __init__(self, indim):
         super().__init__()
-        self.compress = BasicBlock(1024, 512)
+        self.compress = BasicBlock(indim, 512, 
+            downsample=nn.Conv2d(indim,512, kernel_size=3, padding=1))
         self.up_16_8 = UpsampleBlock(512, 512, 256) # 1/16 -> 1/8
         self.up_8_4 = UpsampleBlock(256, 256, 256) # 1/8 -> 1/4
 

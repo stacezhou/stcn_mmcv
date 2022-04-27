@@ -11,7 +11,8 @@ class FeatureFusionBlock(nn.Module):
     def __init__(self, indim, outdim):
         super().__init__()
 
-        self.block1 = BasicBlock(indim, outdim)
+        self.block1 = BasicBlock(indim, outdim, 
+                downsample=nn.Conv2d(indim, outdim, kernel_size=3, padding=1))
         self.attention = CBAM(outdim)
         self.block2 = BasicBlock(outdim, outdim)
 
@@ -36,8 +37,8 @@ class ValueEncoder(BaseModule):
     def forward(self, mask, feats):
         img = feats['img']
         f16 = feats['f16']
-        f = torch.cat([img,mask],1)
-        x = self.backbone(f)
+        f = torch.cat([img,mask.unsqueeze(1)],1)
+        x = self.backbone(f)[0]
         x = self.feature_fusion(x, f16)
         return x
 
@@ -53,7 +54,7 @@ class KeyEncoder(BaseModule):
         self.key_proj = VOSMODEL.build(key_proj)
         self.key_comp = VOSMODEL.build(key_comp)
     
-    def updata_targets(self, broadcast_map):
+    def update_targets(self, broadcast_map):
         self.ii = broadcast_map
 
     def forward(self, img, feats=None):

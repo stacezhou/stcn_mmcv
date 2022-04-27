@@ -16,7 +16,7 @@ class STCN(BaseModule):
                 loss_fn,
                 init_cfg=None):
         super().__init__(init_cfg)
-        self.key_encoder = BACKBONES.build(key_encoder)
+        self.key_encoder = VOSMODEL.build(key_encoder)
         self.value_encoder = VOSMODEL.build(value_encoder)
         self.mask_decoder = VOSMODEL.build(mask_decoder)
         self.memory = VOSMODEL.build(memory)
@@ -42,7 +42,7 @@ class STCN(BaseModule):
     
         self.memory.update_targets(broadcast_map)
         self.key_encoder.update_targets(broadcast_map)
-        self.mask_decoderx.update_targets(aggregate_map)
+        self.mask_decoder.update_targets(aggregate_map)
 
     def parse_targets(self, gt_mask):
         prob = torch.stack([
@@ -67,7 +67,10 @@ class STCN(BaseModule):
         self.memory.write(K, V)
 
         if return_loss:
-            loss = self.loss_fn(logits, gt_mask)
+            if flag == 'new_video':
+                loss = 0
+            else:
+                loss = self.loss_fn(logits, gt_mask)
             output = {'loss': loss}
         else:
             output = {'mask': mask_prob}
