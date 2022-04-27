@@ -1,8 +1,12 @@
 from torch.utils.data import Dataset
 from pathlib import Path
 from random import randint
-from mmdet.datasets import DATASETS
 from mmdet.datasets.pipelines import Compose
+from mmcv.utils import Registry
+import mmcv
+import numpy as np
+VOSDATASETS = Registry('vos_dataset')
+
 
 def listdir(path, complete_path = True):
     if complete_path:
@@ -16,7 +20,7 @@ def listfile(path, pattern, complete_path = True):
     else:
         return sorted([str(f.name) for f in Path(path).glob(pattern=pattern)])
 
-@DATASETS.register_module()
+@VOSDATASETS.register_module()
 class StaticDataset(Dataset):
     def __init__(self,  pipeline=[], num_frames=3, image_root=None,video_root=None):
         assert image_root is not None or video_root is not None
@@ -60,7 +64,7 @@ class StaticDataset(Dataset):
             output.append(self[idx])
         return output
 
-@DATASETS.register_module()
+@VOSDATASETS.register_module()
 class VOSTrainDataset(Dataset):
     def __init__(self, image_root, mask_root, pipeline=[], max_skip=10, num_frames=3, min_skip=1):
         mask_videos = listdir(mask_root, complete_path=False)
@@ -75,12 +79,41 @@ class VOSTrainDataset(Dataset):
         self.flex_quota = max_skip - min_skip * (num_frames - 1) - 1
         assert self.flex_quota >= 0, 'max_skip is too small or min_skip is too big'
 
-        self.frames = dict()
-        for v in self.videos:
-            mask_frames = listfile(Path(mask_root) / v, '*.png')
-            image_frames = listfile(Path(image_root) / v, '*.jpg')
-            assert len(mask_frames) == len(image_frames), f'nums of JPG & mask not match {v}'
-            self.frames[v] = list(zip(image_frames,mask_frames))
+        meta_stcn = Path(image_root) / 'meta_stcn.json'
+        if meta_stcn.exists():
+            self.data_infos = mmcv.load(str(meta_stcn))
+        else:
+            self.data_infos = dict()
+            for v in self.videos:
+                mask_frames = listfile(Path(mask_root) / v, '*.png')
+                image_frames = listfile(Path(image_root) / v, '*.jpg')
+                assert len(mask_frames) == len(image_frames), f'nums of JPG & mask not match {v}'
+                from PIL import Image
+                H,W,C = Image.open(str(image_frames[0])).__array__().shape
+                frame_and_mask = list(zip(image_frames,mask_frames))
+                self.data_infos[v] = {
+                    'img_height' : H,
+                    'img_width' : W,
+                    'nums_frame' : len(frame_and_mask),
+                    'frame_and_mask':frame_and_mask
+                }
+            mmcv.dump(self.data_infos, meta_stcn)
+        self._set_group_flag()
+        
+        
+
+    def _set_group_flag(self):
+        """Set flag according to image aspect ratio.
+
+        Images with aspect ratio greater than 1 will be set as group 1,
+        otherwise group 0.
+        """
+        self.flag = np.zeros(len(self), dtype=np.uint8)
+        for i,v in enumerate(self.videos):
+            H = self.data_infos[v]['img_height']
+            W = self.data_infos[v]['img_width']
+            if H / W > 1:
+                self.flag[i] = 1
         
     def __len__(self):
         return len(self.videos)
@@ -100,7 +133,7 @@ class VOSTrainDataset(Dataset):
 
     def __getitem__(self, index):
         v = self.videos[index]
-        frames = self.frames[v]
+        frames = self.data_infos[v]['frame_and_mask']
         chosen_frames = self._random_choose_frames(frames)
         data_batch = []
         for image,mask in chosen_frames:
@@ -115,7 +148,7 @@ class VOSTrainDataset(Dataset):
         return data_batch
 
 
-@DATASETS.register_module()
+@VOSDATASETS.register_module()
 class VOSTestDataset(Dataset):
 
     def __init__(self, image_root, ref_mask_root, gt_mask_root = None, pipeline = None):

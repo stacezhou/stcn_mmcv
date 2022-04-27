@@ -1,6 +1,8 @@
+_base_ = [ '_base/default_runtime.py','model/stcn.py']
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
-pipeline= [
+train_vos_pipeline= [
+
     dict(type='LoadImageFromFile'),
     dict(type='LoadMaskFromFile'),
     # dict(type='RandomCrop', ),
@@ -16,8 +18,12 @@ pipeline= [
     dict(type='SafeCollect', keys=['img', 'gt_mask'], ),
 ]
 data = dict(
-    type='VOSTrainDataset',
-    pipeline = pipeline,
-    image_root = '/data/YouTube/train_480p/JPEGImages',
-    mask_root = '/data/YouTube/train_480p/Annotations',
+    workers_per_gpu = 2,
+    samples_per_gpu=2,
+    train = dict(
+        type='VOSTrainDataset',
+        pipeline = train_vos_pipeline,
+        image_root = '/data/DAVIS/2017/trainval/JPEGImages/480p',
+        mask_root = '/data/DAVIS/2017/trainval/Annotations/480p',
+    )
 )
