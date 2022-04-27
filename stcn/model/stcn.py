@@ -6,6 +6,16 @@ import torch
 
 VOSMODEL = Registry('vos_model')
 
+def safe_torch_cat(TensorList, *k, **kw):
+    valid_tensor_list = []
+    for T in TensorList:
+        if T is not None:
+            valid_tensor_list.append(T)
+    if len(valid_tensor_list) != 0:
+        return torch.cat(valid_tensor_list, *k, **kw)
+    else:
+        return None
+
 @VOSMODEL.register_module()
 class STCN(BaseModule):
     def __init__(self, 
@@ -23,63 +33,81 @@ class STCN(BaseModule):
         self.loss_fn = LOSSES.build(loss_fn)
         self.targets = []
     
-    def update_targets(self, gt_mask):
-        # 出现了新的目标: 一般只在第一帧，Youtube 后续帧也会出现新目标
-        this_objs = [
-            (img_id,obj_label) 
-            for img_id,frame_gt in enumerate(gt_mask)
-            for obj_label in frame_gt.unique().tolist() 
-        ]
-        new_objs = sorted(list(set(this_objs) - set(self.targets)))
+    def update_targets(self, new_objs):
         self.targets.extend(new_objs)
         
         # [0,0,1,1,2,2,3,3,1] -> 9 objs , 4 image
-        broadcast_map=[i for i,l in self.targets]
+        fi_list=[i for i,l in self.targets]
 
         # [[0,1],[2,3,8],[4,5],[6,7]] -> 9 objs, 4 image
-        aggregate_map = [[] for _ in range(len(set(broadcast_map)))]
-        for oi,fi in enumerate(broadcast_map):
-            aggregate_map[fi].append(oi)
+        oi_groups = [[] for _ in range(len(set(fi_list)))]
+        for oi,fi in enumerate(fi_list):
+            oi_groups[fi].append(oi)
     
-        self.memory.update_targets(broadcast_map)
-        self.key_encoder.update_targets(broadcast_map)
-        self.mask_decoder.update_targets(aggregate_map)
-        self.aggregate_map = aggregate_map
+        self.memory.update_targets(fi_list)
+        self.fi_list = fi_list
+        self.oi_groups = oi_groups
 
 
     def parse_targets(self, gt_mask):
-        prob = torch.stack([
-            gt_mask[i] == label 
-            for i,label in self.targets
-        ])
-        return prob
+        # 出现了新的目标: 一般只在第一帧，Youtube 后续帧也会出现新目标
+        this_objs = [
+            (fi,label) 
+            for fi,frame_gt in enumerate(gt_mask)
+            for label in frame_gt.unique().tolist() 
+        ]
+        new_objs = sorted(list(set(this_objs) - set(self.targets)))
+
+        if len(self.targets) > 0:
+            old_gt_mask = torch.stack([
+                gt_mask[i] == label 
+                for i,label in self.targets
+            ])
+        else:
+            old_gt_mask = None
+        if len(new_objs) > 0:
+            new_gt_mask = torch.stack([
+                gt_mask[i] == label 
+                for i,label in new_objs
+            ])
+            self.update_targets(new_objs)
+        else:
+            new_gt_mask = None
+        return old_gt_mask, new_gt_mask
 
     def forward(self,img, gt_mask, flag, return_loss=False,*k,**kw):
+        K, feats = self.key_encoder(img) 
         if flag == 'new_video':
-            # self.memory.reset()
             self.memory.reset()
-            self.update_targets(gt_mask)
-            K, feats = self.key_encoder(img) 
-            mask_prob = self.parse_targets(gt_mask)
+            self.targets = []
+            self.oi_groups = []
+            pred_mask = None
+            pred_logits = None
         else:
-            K, feats = self.key_encoder(img) 
+            # 先预测
             V = self.memory.read(K)
-            logits, mask_prob = self.mask_decoder(V, feats)
+            pred_logits, pred_mask = self.mask_decoder(V, feats, self.fi_list)
 
-        V = self.value_encoder(mask_prob, feats)
+        # 然后增加新 GT
+
+        oi_groups = self.oi_groups.copy()
+        old_gt_mask, new_gt_mask = self.parse_targets(gt_mask)
+        mask = safe_torch_cat([pred_mask, new_gt_mask],dim=0)
+        V = self.value_encoder(mask, feats, self.fi_list)
         self.memory.write(K, V)
 
-        if return_loss and flag == 'new_video':
-            output = {'loss': 0}
-        elif return_loss and flag != 'new_video':
+        if return_loss:
             loss = 0
-            for i,objs_per_frame in enumerate(self.aggregate_map):
-                cls_gt = gt_mask[i].long()
-                logits_one_frame = logits[objs_per_frame].swapaxes(0,1)
-                loss += self.loss_fn(logits_one_frame, cls_gt)
+            for i,oii in enumerate(oi_groups):
+                cls_gt = torch.topk(
+                    old_gt_mask[oii].char(), 
+                    k = 1, 
+                    dim=0)[1].squeeze(0)
+                logits = pred_logits[oii].swapaxes(0,1)
+                loss += self.loss_fn(logits, cls_gt)
             output = {'loss': loss}
         else:
-            output = {'mask': mask_prob}
+            output = {'mask': mask}
 
         return output
 

@@ -28,21 +28,10 @@ class MaskDecoder(BaseModule):
 
         self.pred = nn.Conv2d(256, 1, kernel_size=(3,3), padding=(1,1), stride=1)
 
-    def update_targets(self, aggregate_map):
-        pass
-
-    def aggregate(self, prob):
-        new_prob = torch.cat([
-            torch.prod(1-prob, dim=1, keepdim=True),
-            prob
-        ], 1).clamp(1e-7, 1-1e-7)
-        logits = torch.log((new_prob /(1-new_prob)))
-        return logits
-
-    def forward(self, V, feats):
-        f16_thin = feats['f16_thin']
-        f8 = feats['f8']
-        f4 = feats['f4']
+    def forward(self, V, feats, fii):
+        f16_thin = feats['f16_thin'][fii]
+        f8 = feats['f8'][fii]
+        f4 = feats['f4'][fii]
         x = torch.cat([V,f16_thin], dim=1)
         x = self.compress(V)
         x = self.up_16_8(f8, x)

@@ -16,7 +16,7 @@ custom_imports = dict(
     imports=['stcn.loss.bce', 'stcn.model'], allow_failed_imports=False)
 model = dict(
     type='STCN',
-    init_cfg=None,
+    init_cfg=dict(type='Kaiming', layer='Conv2d'),
     key_encoder=dict(
         type='KeyEncoder',
         backbone=dict(
