@@ -1,3 +1,5 @@
+key_dim = 64
+value_dim = 512
 model = dict(
     type = 'STCN',
     key_encoder = dict(

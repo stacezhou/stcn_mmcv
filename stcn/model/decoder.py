@@ -42,8 +42,10 @@ class MaskDecoder(BaseModule):
         return logits
 
     def forward(self, V, feats):
+        f16_thin = feats['f16_thin']
         f8 = feats['f8']
         f4 = feats['f4']
+        x = torch.cat([V,f16_thin], dim=1)
         x = self.compress(V)
         x = self.up_16_8(f8, x)
         x = self.up_8_4(f4, x)
