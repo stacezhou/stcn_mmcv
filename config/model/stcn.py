@@ -5,6 +5,7 @@ custom_imports = dict(
     allow_failed_imports=False)
 model = dict(
     type = 'STCN',
+    init_cfg = None,
     key_encoder = dict(
         type = 'KeyEncoder',
         backbone = dict(
@@ -12,7 +13,8 @@ model = dict(
             depth=50,
             out_indices=(0, 1, 2),
             frozen_stages=1,
-            init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')
+            init_cfg=dict(type='Pretrained', 
+                checkpoint='torchvision://resnet50')
         ),
         key_proj = dict(
             type='KeyProjection', 
@@ -34,8 +36,9 @@ model = dict(
             in_channels=4,
             out_indices=(2,),
             frozen_stages=1,
-            init_cfg=dict(type='Pretrained', 
-                    checkpoint='torchvision://resnet50')),
+            # init_cfg=dict(type='Pretrained', 
+                # checkpoint='torchvision://resnet18')
+        ),
         feature_fusion = dict(
             type = 'FeatureFusionBlock',
             indim = 1024 + 256,

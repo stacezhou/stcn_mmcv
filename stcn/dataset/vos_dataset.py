@@ -2,10 +2,9 @@ from torch.utils.data import Dataset
 from pathlib import Path
 from random import randint
 from mmdet.datasets.pipelines import Compose
-from mmcv.utils import Registry
+from mmdet.datasets import DATASETS
 import mmcv
 import numpy as np
-VOSDATASETS = Registry('vos_dataset')
 
 
 def listdir(path, complete_path = True):
@@ -20,7 +19,7 @@ def listfile(path, pattern, complete_path = True):
     else:
         return sorted([str(f.name) for f in Path(path).glob(pattern=pattern)])
 
-@VOSDATASETS.register_module()
+@DATASETS.register_module()
 class StaticDataset(Dataset):
     def __init__(self,  pipeline=[], num_frames=3, image_root=None,video_root=None):
         assert image_root is not None or video_root is not None
@@ -64,9 +63,9 @@ class StaticDataset(Dataset):
             output.append(self[idx])
         return output
 
-@VOSDATASETS.register_module()
+@DATASETS.register_module()
 class VOSTrainDataset(Dataset):
-    def __init__(self, image_root, mask_root, pipeline=[], max_skip=10, num_frames=3, min_skip=1):
+    def __init__(self, image_root, mask_root, pipeline=[], max_skip=10, num_frames=3, min_skip=1, test_mode=False, **kw):
         mask_videos = listdir(mask_root, complete_path=False)
         image_videos = listdir(image_root, complete_path=False)
         self.videos = sorted(list(set(mask_videos) & set(image_videos)))
@@ -148,7 +147,7 @@ class VOSTrainDataset(Dataset):
         return data_batch
 
 
-@VOSDATASETS.register_module()
+@DATASETS.register_module()
 class VOSTestDataset(Dataset):
 
     def __init__(self, image_root, ref_mask_root, gt_mask_root = None, pipeline = None):

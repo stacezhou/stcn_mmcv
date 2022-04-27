@@ -6,7 +6,7 @@ from .stcn import VOSMODEL
 from .component import CBAM,BasicBlock
 
 @VOSMODEL.register_module()
-class FeatureFusionBlock(nn.Module):
+class FeatureFusionBlock(BaseModule):
     def __init__(self, indim, outdim):
         super().__init__()
 

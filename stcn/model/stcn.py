@@ -86,8 +86,8 @@ class STCN(BaseModule):
     def train_step(self, data_batch, optimizer, **kw):
         output = defaultdict(list)
         for i,data in enumerate(data_batch):
-            img = data['img'].data[0]
-            gt_mask = data['gt_mask'].data[0]
+            img = data['img'].data
+            gt_mask = data['gt_mask'].data
             flag = 'new_video' if i == 0 else ''
             output[i] = self.forward(
                     img = img,
@@ -98,7 +98,11 @@ class STCN(BaseModule):
 
         loss = sum([item['loss'] for key,item in output.items()])
         return {
-            'loss' : loss
+            'loss' : loss,
+            'num_samples': len(data_batch) * img.shape[0],
+            'log_vars' : {
+                'loss' : loss.detach().cpu(),
+            }
         }
 
     
