@@ -94,7 +94,8 @@ class STCN(BaseModule):
             self.targets = []
             self.oi_groups = []
             pred_mask = None
-        else:
+        
+        if self.memory.is_init:
             # 先预测
             V = self.memory.read(K)
             pred_logits, pred_mask = self.mask_decoder(V, feats, self.fi_list)
@@ -103,11 +104,12 @@ class STCN(BaseModule):
         oi_groups = self.oi_groups.copy()
         old_gt_mask, new_gt_mask = self.parse_targets(gt_mask)
         mask = safe_torch_cat([pred_mask, new_gt_mask],dim=0)
-        V = self.value_encoder(mask, feats, self.fi_list)
-        self.memory.write(K, V)
+        if mask is not None:
+            V = self.value_encoder(mask, feats, self.fi_list)
+            self.memory.write(K, V)
 
         if return_loss:
-            loss = 0
+            loss = 0*torch.sum(K)
             for oii in oi_groups:
                 if len(oii) == 0:
                     continue

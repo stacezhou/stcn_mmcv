@@ -20,10 +20,10 @@ train_vos_pipeline= [
 ]
 data = dict(
     workers_per_gpu = 0,
-    samples_per_gpu= 4,
+    samples_per_gpu = 2,
     train = dict(
         type='VOSTrainDataset',
-        nums_frame = 4,
+        nums_frame = 3,
         max_skip=10,
         min_skip=1,
         pipeline = train_vos_pipeline,
@@ -43,3 +43,5 @@ lr_config = dict(
     warmup_ratio=1.0 / 3,
     step=[190])
 runner = dict(type='EpochBasedRunner', max_epochs=210)
+find_unused_parameters = True
+fp16 = dict(loss_scale=512.)
