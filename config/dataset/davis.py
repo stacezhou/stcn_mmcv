@@ -3,12 +3,14 @@ img_norm_cfg = dict(
 pipeline= [
     dict(type='LoadImageFromFile'),
     dict(type='LoadMaskFromFile'),
-    # dict(type='Resize', img_scale=(384, 384), keep_ratio=True),
     # dict(type='RandomCrop', ),
     dict(type='MergeImgMask'),
+    dict(type='Resize', img_scale=(896, 480), keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
-    dict(type='Pad', size_divisor=16),
+    dict(type='Pad', size_divisor=32),
     dict(type='SplitImgMask'),
+    dict(type='ImageToTensor',keys=['gt_mask']),
+    dict(type='ToDataContainer',fields=(dict(key='gt_mask',stack=True),)),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='DefaultFormatBundle'),
     dict(type='SafeCollect', keys=['img', 'gt_mask'], ),
@@ -16,6 +18,6 @@ pipeline= [
 data = dict(
     type='VOSTrainDataset',
     pipeline = pipeline,
-    image_root = '/data/YouTube/train_480p/JPEGImages',
-    mask_root = '/data/YouTube/train_480p/Annotations',
+    image_root = '/data/DAVIS/2017/trainval/JPEGImages/480p',
+    mask_root = '/data/DAVIS/2017/trainval/Annotations/480p',
 )

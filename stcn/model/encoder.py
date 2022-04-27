@@ -3,16 +3,14 @@ import torch
 from mmcv.runner import BaseModule
 from mmdet.models import BACKBONES
 from .stcn import VOSMODEL
-from .cbam import CBAM
-from mmdet.models.backbones.resnet import BasicBlock
+from .component import CBAM,BasicBlock
 
 @VOSMODEL.register_module()
 class FeatureFusionBlock(nn.Module):
     def __init__(self, indim, outdim):
         super().__init__()
 
-        self.block1 = BasicBlock(indim, outdim, 
-                downsample=nn.Conv2d(indim, outdim, kernel_size=3, padding=1))
+        self.block1 = BasicBlock(indim, outdim)
         self.attention = CBAM(outdim)
         self.block2 = BasicBlock(outdim, outdim)
 
@@ -37,7 +35,7 @@ class ValueEncoder(BaseModule):
     def forward(self, mask, feats):
         img = feats['img']
         f16 = feats['f16']
-        f = torch.cat([img,mask.unsqueeze(1)],1)
+        f = torch.cat([img,mask],1)
         x = self.backbone(f)[0]
         x = self.feature_fusion(x, f16)
         return x

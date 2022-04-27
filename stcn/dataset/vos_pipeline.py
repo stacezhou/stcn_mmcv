@@ -2,17 +2,43 @@ from torchvision import transforms
 from mmdet.datasets import PIPELINES
 from mmcv.parallel import DataContainer as DC
 from PIL import Image
+import numpy as np
 
 @PIPELINES.register_module()
 class LoadMaskFromFile:
     def __call__(self, results):
         mask_file = results['ann_info']['masks']
-        gt_mask = Image.open(mask_file).convert('L').__array__()
+        gt_mask = Image.open(mask_file).convert('P').__array__()
         return {
             **results,
             'gt_mask': gt_mask,
-            'mask_field':['gt_mask']
+            'mask_fields':['gt_mask']
         }
+
+@PIPELINES.register_module()
+class MergeImgMask:
+    def __call__(self, results):
+        img = results['img']
+        mask = results['gt_mask']
+        img_w_mask = np.concatenate([img,np.expand_dims(mask,2)], axis=2)
+        results['img'] = img_w_mask
+        results['mask_fields'].remove('gt_mask')
+        # results['img_fields'] = ['img', 'gt_mask']
+        return results
+
+@PIPELINES.register_module()
+class SplitImgMask:
+    def __call__(self, results):
+        img_w_mask = results['img']
+        img = img_w_mask[:,:,:3]
+        mask = img_w_mask[:,:,3]
+        results['img'] = img
+        results['gt_mask'] = mask
+        results['mask_fields'].append('gt_mask')
+        return results
+
+
+
 
 @PIPELINES.register_module()
 class SafeCollect:

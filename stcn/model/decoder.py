@@ -1,11 +1,10 @@
 from mmcv.runner import BaseModule
 import torch
-from mmdet.models.backbones.resnet import BasicBlock
 from .stcn import VOSMODEL
 import torch.nn as nn
 import torch.nn.functional as F
+from .component import BasicBlock
 
-@VOSMODEL.register_module()
 class UpsampleBlock(BaseModule):
     def __init__(self, skip_c, up_c, out_c, scale_factor=2):
         super().__init__()
@@ -23,8 +22,7 @@ class UpsampleBlock(BaseModule):
 class MaskDecoder(BaseModule):
     def __init__(self, indim):
         super().__init__()
-        self.compress = BasicBlock(indim, 512, 
-            downsample=nn.Conv2d(indim,512, kernel_size=3, padding=1))
+        self.compress = BasicBlock(indim, 512)
         self.up_16_8 = UpsampleBlock(512, 512, 256) # 1/16 -> 1/8
         self.up_8_4 = UpsampleBlock(256, 256, 256) # 1/8 -> 1/4
 

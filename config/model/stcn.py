@@ -1,5 +1,8 @@
 key_dim = 64
 value_dim = 512
+custom_imports = dict(
+    imports=['stcn.loss.bce','stcn.model'],
+    allow_failed_imports=False)
 model = dict(
     type = 'STCN',
     key_encoder = dict(
@@ -44,5 +47,5 @@ model = dict(
         indim = 512,
     ),
     memory = dict(type= 'AffinityMemoryBank'),
-    loss_fn = dict(type = 'StcnBCELoss'),
+    loss_fn = dict(type = 'BootstrappedCE'),
 )

@@ -1,7 +1,7 @@
 from mmcv.runner import BaseModule
 from mmcv.utils import Registry
 from collections import defaultdict
-from mmdet.models import BACKBONES
+from mmdet.models import BACKBONES, LOSSES
 import torch
 
 VOSMODEL = Registry('vos_model')
@@ -20,7 +20,7 @@ class STCN(BaseModule):
         self.value_encoder = VOSMODEL.build(value_encoder)
         self.mask_decoder = VOSMODEL.build(mask_decoder)
         self.memory = VOSMODEL.build(memory)
-        self.loss_fn = loss_fn
+        self.loss_fn = LOSSES.build(loss_fn)
         self.targets = []
     
     def update_targets(self, gt_mask):
@@ -33,16 +33,19 @@ class STCN(BaseModule):
         new_objs = sorted(list(set(this_objs) - set(self.targets)))
         self.targets.extend(new_objs)
         
+        # [0,0,1,1,2,2,3,3,1] -> 9 objs , 4 image
         broadcast_map=[i for i,l in self.targets]
-            # [0,0,1,1,2,2,3,3,1] -> 9 objs , 4 image
-        aggregate_map = [[]]*len(set(broadcast_map))
+
+        # [[0,1],[2,3,8],[4,5],[6,7]] -> 9 objs, 4 image
+        aggregate_map = [[] for _ in range(len(set(broadcast_map)))]
         for oi,fi in enumerate(broadcast_map):
             aggregate_map[fi].append(oi)
-        # [[0,1],[2,3,8],[4,5],[6,7]] -> 9 objs, 4 image
     
         self.memory.update_targets(broadcast_map)
         self.key_encoder.update_targets(broadcast_map)
         self.mask_decoder.update_targets(aggregate_map)
+        self.aggregate_map = aggregate_map
+
 
     def parse_targets(self, gt_mask):
         prob = torch.stack([
@@ -66,11 +69,14 @@ class STCN(BaseModule):
         V = self.value_encoder(mask_prob, feats)
         self.memory.write(K, V)
 
-        if return_loss:
-            if flag == 'new_video':
-                loss = 0
-            else:
-                loss = self.loss_fn(logits, gt_mask)
+        if return_loss and flag == 'new_video':
+            output = {'loss': 0}
+        elif return_loss and flag != 'new_video':
+            loss = 0
+            for i,objs_per_frame in enumerate(self.aggregate_map):
+                cls_gt = gt_mask[i].long()
+                logits_one_frame = logits[objs_per_frame].swapaxes(0,1)
+                loss += self.loss_fn(logits_one_frame, cls_gt)
             output = {'loss': loss}
         else:
             output = {'mask': mask_prob}
@@ -81,7 +87,7 @@ class STCN(BaseModule):
         output = defaultdict(list)
         for i,data in enumerate(data_batch):
             img = data['img'].data[0]
-            gt_mask = data['gt_mask']
+            gt_mask = data['gt_mask'].data[0]
             flag = 'new_video' if i == 0 else ''
             output[i] = self.forward(
                     img = img,

@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from mmdet.models.backbones.resnet import BasicBlock as _BasicBlock
 
 class BasicConv(nn.Module):
     def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True):
@@ -75,3 +76,10 @@ class CBAM(nn.Module):
         if not self.no_spatial:
             x_out = self.SpatialGate(x_out)
         return x_out
+
+
+class BasicBlock(_BasicBlock):
+    def __init__(self, inplanes, planes, stride=1, dilation=1, downsample=None, style='pytorch', with_cp=False, conv_cfg=None, norm_cfg=dict(type='BN'), dcn=None, plugins=None, init_cfg=None):
+        if downsample is None and inplanes != planes:
+            downsample = nn.Conv2d(inplanes,planes, kernel_size=3, padding=1)
+        super().__init__(inplanes, planes, stride, dilation, downsample, style, with_cp, conv_cfg, norm_cfg, dcn, plugins, init_cfg)
