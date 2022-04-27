@@ -29,6 +29,9 @@ class MaskDecoder(BaseModule):
 
         self.pred = nn.Conv2d(256, 1, kernel_size=(3,3), padding=(1,1), stride=1)
 
+    def update_targets(self, aggregate_map):
+        pass
+
     def aggregate(self, prob):
         new_prob = torch.cat([
             torch.prod(1-prob, dim=1, keepdim=True),
@@ -49,7 +52,5 @@ class MaskDecoder(BaseModule):
         logits = F.interpolate(x, scale_factor=4, mode='bilinear', align_corners=False)
 
         prob = torch.sigmoid(logits)
-        logits = self.aggregate(prob)
-        prob = F.softmax(logits, dim=1)[:, 1:]
 
         return logits, prob

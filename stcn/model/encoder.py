@@ -52,6 +52,9 @@ class KeyEncoder(BaseModule):
         self.backbone = BACKBONES.build(backbone)
         self.key_proj = VOSMODEL.build(key_proj)
         self.key_comp = VOSMODEL.build(key_comp)
+    
+    def updata_targets(self, broadcast_map):
+        self.ii = broadcast_map
 
     def forward(self, img, feats=None):
         b = img.shape[0]
@@ -69,11 +72,11 @@ class KeyEncoder(BaseModule):
         f8 = f8.view(b, *f8.shape[-3:])
         f4 = f4.view(b, *f4.shape[-3:])
         feats = {
-            'f16' : f16,
-            'f8' : f8,
-            'f4' : f4,
-            'img' : img,
-            'f16_thin' : f16_thin,
+            'f16' : f16[self.ii],
+            'f8' : f8[self.ii],
+            'f4' : f4[self.ii],
+            'img' : img[self.ii],
+            'f16_thin' : f16_thin[self.ii],
             'K' : k16
         }
 
