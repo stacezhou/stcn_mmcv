@@ -1,6 +1,7 @@
 from pathlib import Path
 from PIL import Image
 import numpy as np
+from tqdm import tqdm
 
 def listdir(path, complete_path = True):
     if complete_path:
@@ -25,9 +26,11 @@ def generate_meta(image_root, mask_root):
     videos = sorted(list(set(mask_videos) & set(image_videos)))
     data_infos = dict()
     # todo video target nums meta
-    for v in videos:
+    for v in tqdm(videos):
         mask_frames = listfile(Path(mask_root) / v, '*.png', complete_path=False)
+        mask_frames = [str(Path(v) / m) for m in mask_frames]
         image_frames = listfile(Path(image_root) / v, '*.jpg',complete_path=False)
+        image_frames = [str(Path(v) / m) for m in image_frames]
         H,W,C = Image.open(str(Path(image_root) / image_frames[0])).__array__().shape
 
         labels_set = set()
