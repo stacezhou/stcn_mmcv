@@ -28,7 +28,7 @@ class DistributedGroupSampler(Sampler):
                  samples_per_gpu=1,
                  num_replicas=None,
                  rank=None,
-                 max_objs_per_gpu=16,
+                 max_objs_per_gpu=-1,
                  seed=0):
         _rank, _num_replicas = get_dist_info()
         if num_replicas is None:
@@ -50,7 +50,12 @@ class DistributedGroupSampler(Sampler):
             self.indices = [[x] for x in list(range(len(self.dataset)))]
             self.num_samples =  (len(self.dataset.nums_objs) // self.num_replicas + 1 ) * self.dataset.max_nums_frame
         else:
+            m = len(self.dataset.nums_objs) // 2
+            median = sorted(self.dataset.nums_objs)[m]
+            if max_objs_per_gpu == -1:
+                max_objs_per_gpu = median * self.samples_per_gpu
             self.max_objs_per_gpu = max_objs_per_gpu
+            print(f'max objs per gpu is {max_objs_per_gpu}')
             self._collate()
     
     def _collate(self):
