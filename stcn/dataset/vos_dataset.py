@@ -5,6 +5,7 @@ from mmdet.datasets.pipelines import Compose
 from mmdet.datasets import DATASETS
 import mmcv
 import numpy as np
+from .utils import generate_meta
 
 
 def listdir(path, complete_path = True):
@@ -66,40 +67,26 @@ class StaticDataset(Dataset):
 @DATASETS.register_module()
 class VOSTrainDataset(Dataset):
     def __init__(self, image_root, mask_root, pipeline=[],repeat_dataset = 1, max_skip=10, num_frames=3, min_skip=1, test_mode=False, **kw):
-        mask_videos = listdir(mask_root, complete_path=False)
-        image_videos = listdir(image_root, complete_path=False)
-        self.videos = sorted(list(set(mask_videos) & set(image_videos)))
 
         self.pipeline = Compose(pipeline)
         self.repeat = repeat_dataset
 
-        self.min_skip = min_skip
-        self.max_skip = max_skip
-        self.num_frames = num_frames
-        self.min_length = min_skip * (num_frames -1) + 1
+        self.image_root = image_root
+        self.mask_root = mask_root
 
         meta_stcn = Path(image_root) / 'meta_stcn.json'
         if meta_stcn.exists():
             self.data_infos = mmcv.load(str(meta_stcn))
         else:
-            self.data_infos = dict()
-            # todo video target nums meta
-            for v in self.videos:
-                mask_frames = listfile(Path(mask_root) / v, '*.png')
-                image_frames = listfile(Path(image_root) / v, '*.jpg')
-                assert len(mask_frames) == len(image_frames), f'nums of JPG & mask not match {v}'
-                from PIL import Image
-                H,W,C = Image.open(str(image_frames[0])).__array__().shape
-                frame_and_mask = list(zip(image_frames,mask_frames))
-                self.data_infos[v] = {
-                    'img_height' : H,
-                    'img_width' : W,
-                    'nums_frame' : len(frame_and_mask),
-                    'frame_and_mask':frame_and_mask
-                }
+            self.data_infos = generate_meta(image_root, mask_root)
             mmcv.dump(self.data_infos, meta_stcn)
-        
+        self.videos = sorted(list(self.data_infos.keys()))
 
+
+        self.min_skip = min_skip
+        self.max_skip = max_skip
+        self.num_frames = num_frames
+        self.min_length = min_skip * (num_frames -1) + 1
         min_nums_frams = min([v['nums_frame'] for k,v in self.data_infos.items()])
         assert min_nums_frams  > self.min_length, 'too big min_skip'
         self._set_group_flag()
@@ -139,20 +126,51 @@ class VOSTrainDataset(Dataset):
 
     def __getitem__(self, index):
         index = index % len(self.videos)
+        index = index % 4
         v = self.videos[index]
         frames = self.data_infos[v]['frame_and_mask']
         chosen_frames = self._random_choose_frames(frames)
+        # chosen_frames = frames[:self.num_frames]
         data_batch = []
-        for image,mask in chosen_frames:
+        for i,(image,mask) in enumerate(chosen_frames):
             data = {
-                'img_prefix' : None,
+                'img_prefix' : self.image_root,
                 'img_info':{'filename': image},
-                'ann_info': {'masks' : mask}
+                'ann_info': {
+                    'masks' : str(Path(self.mask_root) / mask) ,
+                    'flag'  : 'new_video' if i == 0 else ''
+                    },
             }
             data = self.pipeline(data)
             data_batch.append(data)
 
         return data_batch
+    
+    def prepare_train_data(self, index):
+        index = index % len(self.videos)
+        index = index % 4
+        v = self.videos[index]
+        frames = self.data_infos[v]['frame_and_mask']
+        # chosen_frames = self._random_choose_frames(frames)
+        chosen_frames = frames[:self.num_frames]
+        data_batch = []
+        for i,(image,mask) in enumerate(chosen_frames):
+            data = {
+                'img_prefix' : None,
+                'img_info':{'filename': image},
+                'ann_info': {
+                    'masks' : mask ,
+                    'flag'  : 'new_video' if i == 0 else ''
+                    },
+            }
+            data = self.pipeline(data)
+            data_batch.append(data)
+
+        return data_batch
+    
+    def prepare_test_data(self, index):
+        pass
+
 
 
 @DATASETS.register_module()
