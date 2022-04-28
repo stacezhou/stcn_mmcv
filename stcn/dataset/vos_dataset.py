@@ -100,7 +100,6 @@ class VOSDataset(Dataset):
     def __len__(self):
         return self.max_nums_frame * len(self.videos)
 
-    
     # def _random_choose_frames(self,frame_list):
     #     assert self.num_frames < len(frame_list)
     #     offset = [0]
@@ -151,4 +150,24 @@ class VOSDataset(Dataset):
         return data
     
     def prepare_test_data(self, index):
-        pass
+        v_id = index // self.max_nums_frame
+        v = self.videos[v_id]
+        f_id = index % self.max_nums_frame
+        flag = 'new_video' if f_id == 0 else ''
+        v_l = self.data_infos[v]['nums_frame']
+        if f_id >= v_l: # 0,1,2,3, 2,1,0, 1,2,3, 2,1,0, 1,2,3
+            return {}
+        
+        
+        image, mask = self.data_infos[v]['frame_and_mask'][f_id]
+        data = {
+            'flag'  : flag,
+            'labels' : self.data_infos[v]['labels'],
+            'img_prefix' : self.image_root,
+            'img_info':{'filename': image},
+            'ann_info': {
+                'masks' : str(Path(self.mask_root) / mask) ,
+                },
+        }
+        data = self.pipeline(data)
+        return data
