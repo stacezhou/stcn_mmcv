@@ -26,8 +26,8 @@ train_vos_pipeline= [
 ]
 data = dict(
     workers_per_gpu = 0,
-    samples_per_gpu = 2,
-    max_objs_per_gpu = 9,
+    samples_per_gpu = 3,
+    max_objs_per_gpu = 8,
     nums_frame = 3,
     train = dict(
         type='VOSTrainDataset',

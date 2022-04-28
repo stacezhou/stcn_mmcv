@@ -8,6 +8,21 @@ from typing import  List, TypeVar
 T_co = TypeVar('T_co', covariant=True)
 # class DistributedGroupSampler(Sampler):
 
+def compact_to(target, avi_nums, times, top=True):
+    if times == 1:
+        for n in avi_nums:
+            if n == target:
+                return [n]
+        return [None]
+
+    for n in avi_nums:
+        output = compact_to(target - n, avi_nums, times - 1, False)
+        if None not in output:
+            return [n, *output]
+
+    return [None]
+
+
 class DistributedGroupSampler(Sampler):
     def __init__(self,
                  dataset,
@@ -44,33 +59,28 @@ class DistributedGroupSampler(Sampler):
         for vi,n in enumerate(self.dataset.nums_objs):
             n_vi_dict[n].append(vi)
         # todo random shuffle
-        N = []
-        I = []
-        for n in list(n_vi_dict.keys()):
-            for i in n_vi_dict[n]:
-                N.append(n)
-                I.append(i)
 
-        r = len(N) - 1
-        step = self.samples_per_gpu - 1
-        S = N[r] + N[0] * step
-        while S > self.max_objs_per_gpu and r:
-            r -= 1
-            S = N[r] + N[0] * step
-        assert r, 'max_objs_per_gpu is too small'
-
+        ns = sorted(list(n_vi_dict.keys()))
+        target = self.max_objs_per_gpu
         I_groups = []
-        l = step
-        while l < r:
-            S = N[r] + sum([N[max(l-i,0)] for i in range(step)])
-            while S > self.max_objs_per_gpu:
-                l -= 1
-                S = N[r] + sum([N[max(l-i,0)] for i in range(step)])
-            group = [I[max(l-i,0)] for i in range(step)]
-            group.append(I[r])
-            I_groups.append(group)
-            l += step
-            r -= 1
+
+        print(ns)
+        while True:
+            ns = [n for n in ns if len(n_vi_dict[n])]
+            n_group = compact_to(target, ns, self.samples_per_gpu)
+            while None in n_group and target > 0:
+                target -= 1
+                n_group = compact_to(target, ns, self.samples_per_gpu)
+            if target == 0:
+                break
+
+            while True:
+                try:
+                    i_group = [n_vi_dict[n].pop() for n in n_group]
+                except:
+                    break
+                I_groups.append(i_group)
+
 
         # todo shuffle
         max_size = len(I_groups)  // self.num_replicas * self.num_replicas
