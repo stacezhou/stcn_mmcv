@@ -1,74 +1,17 @@
 from torch.utils.data import Dataset
 from pathlib import Path
-from random import randint,choice
 from mmdet.datasets.pipelines import Compose
 from mmdet.datasets import DATASETS
 import mmcv
-import numpy as np
 from .utils import generate_meta
 
 
-def listdir(path, complete_path = True):
-    if complete_path:
-        return sorted([str(d) for d in Path(path).iterdir()])
-    else:
-        return sorted([str(d.name) for d in Path(path).iterdir()])
-
-def listfile(path, pattern, complete_path = True):
-    if complete_path:
-        return sorted([str(f) for f in Path(path).glob(pattern=pattern)])
-    else:
-        return sorted([str(f.name) for f in Path(path).glob(pattern=pattern)])
-
-@DATASETS.register_module()
-class StaticDataset(Dataset):
-    def __init__(self,  pipeline=[], num_frames=3, image_root=None,video_root=None):
-        assert image_root is not None or video_root is not None
-        if image_root is not None:
-            self.images = listfile(image_root,'*.jpg')
-            self.masks = listfile(image_root, '*.png')
-            assert len(self.images) == len(self.masks)
-        else:
-            self.images = []
-            self.masks = []
-            for image_root in listdir(video_root):
-                images = listfile(image_root,'*.jpg')
-                masks = listfile(image_root, '*.png')
-                assert len(images) == len(masks)
-                self.images += images
-                self.masks += masks
-
-        self.num_frames = num_frames
-        self.pipeline = Compose(pipeline)
-    
-    def __len__(self):
-        return len(self.images)
-    
-    def __getitem__(self, index):
-        image = self.images[index]
-        mask = self.masks[index]
-        data = {
-            'img_prefix' : None,
-            'img_info':{'filename': image},
-            'ann_info': {'masks' : mask}
-        }
-        data = self.pipeline(data)
-            
-        return data
-        
-
-    def __iter__(self):
-        idx = randint(0,len(self)-1)
-        output = []
-        for i in range(self.num_frames):
-            output.append(self[idx])
-        return output
-
 @DATASETS.register_module()
 class VOSDataset(Dataset):
-    def __init__(self, image_root, mask_root, pipeline=[],max_skip=10, num_frames=3, max_objs_per_frame = 2, min_skip=1, test_mode=False, **kw):
+    def __init__(self, image_root, mask_root, pipeline=[],wo_mask_pipeline = [], max_skip=10, num_frames=3, max_objs_per_frame = 2, min_skip=1, test_mode=False, **kw):
 
         self.pipeline = Compose(pipeline)
+        self.wo_mask_pipeline = Compose(wo_mask_pipeline)
 
         self.image_root = image_root
         self.mask_root = mask_root
@@ -135,7 +78,6 @@ class VOSDataset(Dataset):
             else:
                 f_id += 1
         
-        
         image, mask = self.data_infos[v]['frame_and_mask'][f_id]
         data = {
             'flag'  : flag,
@@ -146,6 +88,7 @@ class VOSDataset(Dataset):
                 'masks' : str(Path(self.mask_root) / mask) ,
                 },
         }
+        
         data = self.pipeline(data)
         return data
     
@@ -160,14 +103,18 @@ class VOSDataset(Dataset):
         
         
         image, mask = self.data_infos[v]['frame_and_mask'][f_id]
+        mask = str(Path(self.mask_root) / mask) if mask is not None else None
         data = {
             'flag'  : flag,
             'labels' : self.data_infos[v]['labels'],
             'img_prefix' : self.image_root,
             'img_info':{'filename': image},
             'ann_info': {
-                'masks' : str(Path(self.mask_root) / mask) ,
+                'masks' : mask,
                 },
         }
-        data = self.pipeline(data)
+        if mask is None:
+            data = self.wo_mask_pipeline(data)
+        else:
+            data = self.pipeline(data)
         return data
