@@ -49,14 +49,13 @@ data = dict(
         pipeline = train_vos_pipeline,
         image_root = '/data/YouTube/train_480p/JPEGImages',
         mask_root = '/data/YouTube/train_480p/Annotations',
-        repeat_dataset = 1,
     ),
     test = dict(
         type='VOSDataset',
         pipeline = test_vos_pipeline,
+        test_mode = True,
         image_root = '/data/YouTube/train_480p/JPEGImages',
         mask_root = '/data/YouTube/train_480p/Annotations',
-        repeat_dataset = 1,
     ),
 )
 
