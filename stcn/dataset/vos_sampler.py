@@ -81,6 +81,7 @@ class DistributedGroupSampler(Sampler):
                     break
                 I_groups.append(i_group)
 
+        print(n_vi_dict)
 
         # todo shuffle
         max_size = len(I_groups)  // self.num_replicas * self.num_replicas
