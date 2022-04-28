@@ -87,13 +87,13 @@ class STCN(BaseModule):
             new_gt_mask = None
         return old_gt_mask, new_gt_mask
 
-    def forward(self,img, gt_mask, flag, return_loss=False,*k,**kw):
+    def forward(self,img, gt_mask, img_metas, return_loss=False,*k,**kw):
         K, feats = self.key_encoder(img) 
-        if flag == 'new_video':
+        pred_mask = None
+        if img_metas[0]['flag'] == 'new_video':
             self.memory.reset()
             self.targets = []
             self.oi_groups = []
-            pred_mask = None
         
         if self.memory.is_init:
             # 先预测
@@ -128,7 +128,18 @@ class STCN(BaseModule):
                 'nums_frame': len(oi_groups),
                 }
         else:
-            output = {'mask': mask}
+            out_masks = []
+            for oii in self.oi_groups:
+                if len(oii) == 0:
+                    continue
+                p_mask = mask[oii].float()
+                if not self.use_bg:
+                    bg_mask = compute_bg_prob(p_mask)
+                    p_mask = torch.cat([bg_mask, p_mask], dim=0)
+                out_mask = torch.topk(p_mask, 1,dim=0)[1].squeeze(0)
+                out_masks.append(out_mask)
+                
+            output = {'mask': out_masks, 'img_metas': img_metas}
 
         return output
 
@@ -140,10 +151,11 @@ class STCN(BaseModule):
             gt_mask = data_batch['gt_mask'][i:i+step]
             img_metas = data_batch['img_metas'][i:i+step]
             flag = 'new_video' if i == 0 else ''
+            img_metas[0]['flag'] = flag
             output[i] = self.forward(
                     img = img,
                     gt_mask = gt_mask,
-                    flag=flag,
+                    img_metas=img_metas,
                     return_loss=True,
                     )
 

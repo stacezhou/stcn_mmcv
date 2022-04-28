@@ -72,7 +72,10 @@ def build_dataloader(dataset,
         batch_size = num_gpus * samples_per_gpu
         num_workers = num_gpus * workers_per_gpu
 
-    assert runner_type != 'IterBasedRunner'
+    if dataset.test_mode:
+        samples_per_gpu = 1
+        nums_frame = 1
+        shuffle = False
     sampler = DistributedGroupSampler( dataset, samples_per_gpu, world_size, rank,
         seed=seed, max_objs_per_gpu=max_objs_per_gpu)
     batch_sampler = BatchSampler(sampler=sampler,
