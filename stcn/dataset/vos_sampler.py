@@ -6,7 +6,6 @@ from torch.utils.data import Sampler
 from typing import  List, TypeVar
 
 T_co = TypeVar('T_co', covariant=True)
-# class DistributedGroupSampler(Sampler):
 
 def compact_to(target, avi_nums, times, top=True):
     if times == 1:
@@ -42,13 +41,17 @@ class DistributedGroupSampler(Sampler):
         self.rank = rank
         self.epoch = 0
         self.seed = seed if seed is not None else 0
-        self.max_objs_per_gpu = max_objs_per_gpu
 
-        assert hasattr(self.dataset, 'nums_objs')
         assert hasattr(self.dataset, 'max_nums_frame')
+        assert hasattr(self.dataset, 'nums_objs')
 
         self.M = self.dataset.max_nums_frame
-        self._collate()
+        if self.dataset.test_mode:
+            self.indices = [[x] for x in list(range(len(self.dataset)))]
+            self.num_samples =  (len(self.nums_objs) // self.num_replicas + 1 ) * self.max_nums_frame
+        else:
+            self.max_objs_per_gpu = max_objs_per_gpu
+            self._collate()
     
     def _collate(self):
         # deterministically shuffle based on epoch
@@ -100,7 +103,6 @@ class DistributedGroupSampler(Sampler):
         # subsample
         offset = self.num_samples * self.rank
         indices = self.indices[offset:offset + self.num_samples]
-        assert len(indices) == self.num_samples
 
         return iter(indices)
 

@@ -4,7 +4,6 @@ from stcn.para import get_config
 from stcn import VOSMODEL
 from stcn.dataset.dataloader import build_dataloader
 from mmdet.datasets import DATASETS
-from mmcv.runner.checkpoint import load_checkpoint
 from mmcv.runner import (get_dist_info, load_checkpoint, wrap_fp16_model)
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 
