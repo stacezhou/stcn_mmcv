@@ -44,6 +44,87 @@ class STCN(BaseModule):
         self.use_bg = seg_background
         self.targets = []
     
+
+    def forward(self,img, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
+        pred_mask = None
+        new_gt_mask = None
+        K, feats = self.key_encoder(img) 
+
+        if img_metas[0]['flag'] == 'new_video':
+            self.memory.reset()
+            self.targets = []
+            self.oi_groups = []
+        
+        if self.memory.is_init:
+            V = self.memory.read(K)
+            pred_logits, pred_mask = self.mask_decoder(V, feats, self.fi_list)
+
+        if gt_mask is not None:
+            oi_groups = self.oi_groups.copy()
+            old_gt_mask, new_gt_mask = self.parse_targets(gt_mask)
+
+        mask = safe_torch_cat([pred_mask, new_gt_mask],dim=0)
+        if mask is not None:
+            V = self.value_encoder(mask, feats, self.fi_list)
+            self.memory.write(K, V)
+
+        if return_loss:
+            loss = 0
+            for oii in oi_groups:
+                if len(oii) == 0:
+                    continue
+                cls_gt = self.compute_label(old_gt_mask[oii])
+
+                logits = pred_logits[oii]
+                if not self.use_bg:
+                    bg_logits = compute_bg_logits(logits)
+                    logits = torch.cat([bg_logits, logits], dim=0)
+
+                loss += self.loss_fn(logits.swapaxes(0,1), cls_gt)
+            output = {
+                'loss': loss,
+                'nums_frame': len(oi_groups),
+                }
+        else:
+            out_masks = []
+            for oii in self.oi_groups:
+                if len(oii) == 0:
+                    continue
+
+                out_mask = self.compute_label(mask[oii])
+                out_masks.append(out_mask)
+                
+            output = {'mask': out_masks, 'img_metas': img_metas}
+
+        return output
+
+    def train_step(self, data_batch, optimizer, batch_size = None,**kw):
+        output = defaultdict(list)
+        step = batch_size
+        for i in range(0,len(data_batch['img']),step):
+            img = data_batch['img'][i:i+step]
+            gt_mask = data_batch['gt_mask'][i:i+step]
+            img_metas = data_batch['img_metas'][i:i+step]
+            flag = 'new_video' if i == 0 else ''
+            img_metas[0]['flag'] = flag
+            output[i] = self.forward(
+                    img = img,
+                    gt_mask = gt_mask,
+                    img_metas=img_metas,
+                    return_loss=True,
+                    )
+
+        loss = sum([item['loss'] for key,item in output.items()])
+        nums_frame = sum([item['nums_frame'] for key,item in output.items()])
+        return {
+            'loss' : loss,
+            'num_samples': nums_frame,
+            'log_vars' : {
+                'loss' : loss.detach().cpu(),
+                'mem_num_objs' : self.memory.gate.shape[0],
+            }
+        }
+
     def update_targets(self, new_objs, batch_size):
         self.targets.extend(new_objs)
         
@@ -86,93 +167,11 @@ class STCN(BaseModule):
         else:
             new_gt_mask = None
         return old_gt_mask, new_gt_mask
-
-    def forward(self,img, gt_mask, img_metas, return_loss=False,*k,**kw):
-        K, feats = self.key_encoder(img) 
-        pred_mask = None
-        if img_metas[0]['flag'] == 'new_video':
-            self.memory.reset()
-            self.targets = []
-            self.oi_groups = []
-        
-        if self.memory.is_init:
-            # 先预测
-            V = self.memory.read(K)
-            pred_logits, pred_mask = self.mask_decoder(V, feats, self.fi_list)
-
-        # 然后增加新 GT
-        oi_groups = self.oi_groups.copy()
-        old_gt_mask, new_gt_mask = self.parse_targets(gt_mask)
-        mask = safe_torch_cat([pred_mask, new_gt_mask],dim=0)
-        if mask is not None:
-            V = self.value_encoder(mask, feats, self.fi_list)
-            self.memory.write(K, V)
-
-        if return_loss:
-            loss = 0
-            for oii in oi_groups:
-                if len(oii) == 0:
-                    continue
-                gt_prob = old_gt_mask[oii].char()
-                logits = pred_logits[oii]
-                if not self.use_bg:
-                    bg_prob = compute_bg_prob(gt_prob)
-                    gt_prob = torch.cat([bg_prob, gt_prob], dim=0)
-                    bg_logits = compute_bg_logits(logits)
-                    logits = torch.cat([bg_logits, logits], dim=0)
-
-                cls_gt = torch.topk(gt_prob,1,dim=0)[1].squeeze(0)
-                loss += self.loss_fn(logits.swapaxes(0,1), cls_gt)
-            output = {
-                'loss': loss,
-                'nums_frame': len(oi_groups),
-                }
-        else:
-            out_masks = []
-            for oii in self.oi_groups:
-                if len(oii) == 0:
-                    continue
-                p_mask = mask[oii].float()
-                if not self.use_bg:
-                    bg_mask = compute_bg_prob(p_mask)
-                    p_mask = torch.cat([bg_mask, p_mask], dim=0)
-                out_mask = torch.topk(p_mask, 1,dim=0)[1].squeeze(0)
-                out_masks.append(out_mask)
-                
-            output = {'mask': out_masks, 'img_metas': img_metas}
-
-        return output
-
-    def train_step(self, data_batch, optimizer, batch_size = None,**kw):
-        output = defaultdict(list)
-        step = batch_size
-        for i in range(0,len(data_batch['img']),step):
-            img = data_batch['img'][i:i+step]
-            gt_mask = data_batch['gt_mask'][i:i+step]
-            img_metas = data_batch['img_metas'][i:i+step]
-            flag = 'new_video' if i == 0 else ''
-            img_metas[0]['flag'] = flag
-            output[i] = self.forward(
-                    img = img,
-                    gt_mask = gt_mask,
-                    img_metas=img_metas,
-                    return_loss=True,
-                    )
-
-        loss = sum([item['loss'] for key,item in output.items()])
-        nums_frame = sum([item['nums_frame'] for key,item in output.items()])
-        return {
-            'loss' : loss,
-            'num_samples': nums_frame,
-            'log_vars' : {
-                'loss' : loss.detach().cpu(),
-                'mem_num_objs' : self.memory.gate.shape[0],
-            }
-        }
-
     
-    def val_step(self,data_batch,**kw):
-        # val_step 不会记录梯度
-        return self.forward(**data_batch,return_loss=False)
-
-        
+    def compute_label(self, mask_prob):
+        p_mask = mask_prob.float()
+        if not self.use_bg:
+            bg_mask = compute_bg_prob(p_mask)
+            p_mask = torch.cat([bg_mask, p_mask], dim=0)
+        out_mask_label = torch.topk(p_mask, 1,dim=0)[1].squeeze(0)
+        return out_mask_label
