@@ -82,91 +82,100 @@ class VOSTrainDataset(Dataset):
             mmcv.dump(self.data_infos, meta_stcn)
         self.videos = sorted(list(self.data_infos.keys()))
 
-
         self.min_skip = min_skip
         self.max_skip = max_skip
         self.num_frames = num_frames
         self.min_length = min_skip * (num_frames -1) + 1
-        min_nums_frams = min([v['nums_frame'] for k,v in self.data_infos.items()])
-        assert min_nums_frams  > self.min_length, 'too big min_skip'
-        self._set_group_flag()
+
+        nums_frames = [v['nums_frame'] for k,v in self.data_infos.items()]
+        self.max_nums_frame = max(num_frames) 
+        assert min(nums_frames)  > self.min_length, 'too big min_skip'
+        self.test_mode = test_mode
+        # self._set_group_flag()
+
+        self.nums_objs = [self.data_infos[v]['nums_obj'] for v in self.videos]
         
         
 
-    def _set_group_flag(self):
-        """Set flag according to image aspect ratio.
+    # def _set_group_flag(self):
+    #     """Set flag according to image aspect ratio.
 
-        Images with aspect ratio greater than 1 will be set as group 1,
-        otherwise group 0.
-        """
-        self.flag = np.zeros(len(self), dtype=np.uint8)
-        for i,v in enumerate(self.videos):
-            H = self.data_infos[v]['img_height']
-            W = self.data_infos[v]['img_width']
-            if H / W > 1:
-                self.flag[i] = 1
+    #     Images with aspect ratio greater than 1 will be set as group 1,
+    #     otherwise group 0.
+    #     """
+    #     self.flag = np.zeros(len(self), dtype=np.uint8)
+    #     for i,v in enumerate(self.videos):
+    #         H = self.data_infos[v]['img_height']
+    #         W = self.data_infos[v]['img_width']
+    #         if H / W > 1:
+    #             self.flag[i] = 1
         
     def __len__(self):
-        return int(len(self.videos) * self.repeat)
+        self.max_nums_frame * len(self.videos)
+
     
-    def _random_choose_frames(self,frame_list):
-        assert self.num_frames < len(frame_list)
-        offset = [0]
-        flex_quota = len(frame_list) - self.min_length 
-        start_idx = randint(0, flex_quota)
-        flex_quota -= (start_idx - self.min_skip)
-        for i in range(self.num_frames - 1):
-            plus = min(self.max_skip, flex_quota)
-            fq = randint(self.min_skip,plus) 
-            flex_quota -= (fq - self.min_skip)
-            offset.append(offset[-1] + fq)
+    # def _random_choose_frames(self,frame_list):
+    #     assert self.num_frames < len(frame_list)
+    #     offset = [0]
+    #     flex_quota = len(frame_list) - self.min_length 
+    #     start_idx = randint(0, flex_quota)
+    #     flex_quota -= (start_idx - self.min_skip)
+    #     for i in range(self.num_frames - 1):
+    #         plus = min(self.max_skip, flex_quota)
+    #         fq = randint(self.min_skip,plus) 
+    #         flex_quota -= (fq - self.min_skip)
+    #         offset.append(offset[-1] + fq)
  
-        frames = [frame_list[start_idx + i] for i in offset]
-        return frames
+    #     frames = [frame_list[start_idx + i] for i in offset]
+    #     return frames
 
     def __getitem__(self, index):
-        index = index % len(self.videos)
-        index = index % 4
-        v = self.videos[index]
-        frames = self.data_infos[v]['frame_and_mask']
-        chosen_frames = self._random_choose_frames(frames)
-        # chosen_frames = frames[:self.num_frames]
-        data_batch = []
-        for i,(image,mask) in enumerate(chosen_frames):
-            data = {
-                'img_prefix' : self.image_root,
-                'img_info':{'filename': image},
-                'ann_info': {
-                    'masks' : str(Path(self.mask_root) / mask) ,
-                    'flag'  : 'new_video' if i == 0 else ''
-                    },
-            }
-            data = self.pipeline(data)
-            data_batch.append(data)
+        if not self.test_mode:
+            return self.prepare_train_data(index)
+        else:
+            return self.prepare_test_data(index)
+        # chosen_frames = self._random_choose_frames(frames)
+        # # chosen_frames = frames[:self.num_frames]
+        # data_batch = []
+        # for i,(image,mask) in enumerate(chosen_frames):
+        #     data = {
+        #         'img_prefix' : self.image_root,
+        #         'img_info':{'filename': image},
+        #         'ann_info': {
+        #             'masks' : str(Path(self.mask_root) / mask) ,
+        #             'flag'  : 'new_video' if i == 0 else ''
+        #             },
+        #     }
+        #     data = self.pipeline(data)
+        #     data_batch.append(data)
 
-        return data_batch
+        # return data_batch
     
     def prepare_train_data(self, index):
-        index = index % len(self.videos)
-        index = index % 4
-        v = self.videos[index]
-        frames = self.data_infos[v]['frame_and_mask']
-        # chosen_frames = self._random_choose_frames(frames)
-        chosen_frames = frames[:self.num_frames]
-        data_batch = []
-        for i,(image,mask) in enumerate(chosen_frames):
-            data = {
-                'img_prefix' : None,
-                'img_info':{'filename': image},
-                'ann_info': {
-                    'masks' : mask ,
-                    'flag'  : 'new_video' if i == 0 else ''
-                    },
-            }
-            data = self.pipeline(data)
-            data_batch.append(data)
-
-        return data_batch
+        v_id = index // self.max_nums_frame
+        v = self.videos[v_id]
+        f_id = index % self.max_nums_frame
+        flag = 'new_video' if f_id == 0 else ''
+        v_l = self.data_infos[v]['nums_frame']
+        if f_id >= v_l: # 0,1,2,3, 2,1,0, 1,2,3, 2,1,0, 1,2,3
+            x = (f_id - v_l) // (self.max_nums_frame - 1)
+            f_id = (f_id - v_l) % (self.max_nums_frame - 1)
+            if x % 2 == 0:
+                f_id -= 2
+            else:
+                f_id += 1
+                
+        image, mask = self.data_infos[v]['frame_and_mask'][f_id]
+        data = {
+            'img_prefix' : self.image_root,
+            'img_info':{'filename': image},
+            'ann_info': {
+                'masks' : str(Path(self.mask_root) / mask) ,
+                'flag'  : flag,
+                },
+        }
+        data = self.pipeline(data)
+        return data
     
     def prepare_test_data(self, index):
         pass

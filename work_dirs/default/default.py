@@ -1,6 +1,6 @@
 checkpoint_config = dict(interval=20)
 log_config = dict(
-    interval=5,
+    interval=20,
     hooks=[dict(type='TextLoggerHook'),
            dict(type='TensorboardLoggerHook')])
 dist_params = dict(backend='nccl')
@@ -68,10 +68,10 @@ train_vos_pipeline = [
 ]
 data = dict(
     workers_per_gpu=0,
-    samples_per_gpu=4,
+    samples_per_gpu=2,
     train=dict(
         type='VOSTrainDataset',
-        nums_frame=4,
+        nums_frame=3,
         max_skip=10,
         min_skip=1,
         pipeline=[
@@ -97,9 +97,9 @@ data = dict(
             dict(type='DefaultFormatBundle'),
             dict(type='SafeCollect', keys=['img', 'gt_mask'])
         ],
-        image_root='/data/DAVIS/2017/trainval/JPEGImages/480p',
-        mask_root='/data/DAVIS/2017/trainval/Annotations/480p',
-        repeat_dataset=5))
+        image_root='/data/YouTube/train_480p/JPEGImages',
+        mask_root='/data/YouTube/train_480p/Annotations',
+        repeat_dataset=1))
 optimizer = dict(type='Adam', lr=0.0005)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 lr_config = dict(
@@ -109,6 +109,8 @@ lr_config = dict(
     warmup_ratio=0.3333333333333333,
     step=[190])
 runner = dict(type='EpochBasedRunner', max_epochs=210)
+find_unused_parameters = True
+fp16 = dict(loss_scale=512.0)
 work_dir = './work_dirs/default'
 auto_resume = False
 gpu_ids = [0]

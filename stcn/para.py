@@ -174,4 +174,4 @@ def get_config():
     meta['config'] = cfg.pretty_text
     meta['seed'] = seed
     meta['exp_name'] = osp.basename(args.config)
-    return cfg, args, meta, timestamp, distributed
+    return cfg, meta, timestamp, distributed

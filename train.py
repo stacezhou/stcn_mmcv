@@ -1,10 +1,11 @@
-from mmdet.apis import train_detector as train_model
 from stcn.para import get_config
+from stcn.trainer import train_model
+# from mmdet.apis.train import train_detector as train_model
 from stcn import VOSMODEL
 from mmdet.datasets import DATASETS
 
 def main():
-    cfg, args, meta, timestamp, distributed = get_config()
+    cfg, meta, timestamp, distributed = get_config()
     model = VOSMODEL.build(cfg.model)
     model.init_weights()
     datasets = [DATASETS.build(cfg.data.train)]
