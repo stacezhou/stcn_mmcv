@@ -54,8 +54,8 @@ data = dict(
         type='VOSDataset',
         pipeline = test_vos_pipeline,
         test_mode = True,
-        image_root = '/data/YouTube/train_480p/JPEGImages',
-        mask_root = '/data/YouTube/train_480p/Annotations',
+        image_root = '/data/YouTube/valid/JPEGImages',
+        mask_root = '/data/YouTube/valid/Annotations',
     ),
 )
 

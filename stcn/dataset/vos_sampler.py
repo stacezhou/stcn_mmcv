@@ -48,7 +48,7 @@ class DistributedGroupSampler(Sampler):
         self.M = self.dataset.max_nums_frame
         if self.dataset.test_mode:
             self.indices = [[x] for x in list(range(len(self.dataset)))]
-            self.num_samples =  (len(self.nums_objs) // self.num_replicas + 1 ) * self.max_nums_frame
+            self.num_samples =  (len(self.dataset.nums_objs) // self.num_replicas + 1 ) * self.dataset.max_nums_frame
         else:
             self.max_objs_per_gpu = max_objs_per_gpu
             self._collate()

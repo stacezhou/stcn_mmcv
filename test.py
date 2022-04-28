@@ -15,6 +15,8 @@ def test_dataset(model, data_loader):
 
     model.eval()
     for data in data_loader:
+        if len(data) == 0:
+            continue
         img = data['img'].data[0]
         gt_mask = data['gt_mask'].data[0]
         img_metas = data['img_metas'].data[0]
