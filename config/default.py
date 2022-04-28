@@ -37,6 +37,17 @@ test_vos_pipeline= [
         meta_keys=meta_keys,
     ),
 ]
+wo_mask_pipeline = [
+    dict(type='LoadImageFromFile'),
+    dict(type='Pad', size_divisor=32),
+    dict(type='Normalize', **img_norm_cfg),
+    dict(type='DefaultFormatBundle'),
+    dict(type='SafeCollect',
+        keys=['img'],
+        meta_keys=meta_keys,
+    ),
+
+]
 data = dict(
     workers_per_gpu = 0,
     samples_per_gpu = 2,
@@ -53,6 +64,7 @@ data = dict(
     test = dict(
         type='VOSDataset',
         pipeline = test_vos_pipeline,
+        wo_mask_pipeline = wo_mask_pipeline,
         test_mode = True,
         image_root = '/data/YouTube/valid/JPEGImages',
         mask_root = '/data/YouTube/valid/Annotations',

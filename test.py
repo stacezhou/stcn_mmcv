@@ -18,13 +18,15 @@ def test_dataset(model, data_loader):
         if len(data) == 0:
             continue
         img = data['img'].data[0]
-        gt_mask = data['gt_mask'].data[0]
+        if 'gt_mask' in data:
+            gt_mask = data['gt_mask'].data[0]
+        else:
+            gt_mask = None
         img_metas = data['img_metas'].data[0]
         output = model(img=img,gt_mask=gt_mask,img_metas=img_metas,return_loss = False)
 
         if rank == 0:
-            batch_size = len(data)
-            for _ in range(batch_size * world_size):
+            for _ in range(world_size):
                 prog_bar.update()
 
 def main():

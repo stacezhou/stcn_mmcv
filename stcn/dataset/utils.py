@@ -28,14 +28,18 @@ def generate_meta(image_root, mask_root):
     for v in videos:
         mask_frames = listfile(Path(mask_root) / v, '*.png', complete_path=False)
         image_frames = listfile(Path(image_root) / v, '*.jpg',complete_path=False)
-        assert len(mask_frames) == len(image_frames), f'nums of JPG & mask not match {v}'
-
-        H,W,C = Image.open(str(Path(mask_root) / image_frames[0])).__array__().shape
+        H,W,C = Image.open(str(Path(image_root) / image_frames[0])).__array__().shape
 
         labels_set = set()
         for mask in mask_frames:
             labels_set = labels_set | read_labels(Path(mask_root) / mask)
-        frame_and_mask = list(zip(image_frames,mask_frames))
+        frame_and_mask = []
+        for img in image_frames:
+            mask = img[:-4]+'.png'
+            if mask in mask_frames:
+                frame_and_mask.append([img,mask])
+            else:
+                frame_and_mask.append([img,None])
         data_infos[v] = {
             'img_height' : H,
             'img_width' : W,
