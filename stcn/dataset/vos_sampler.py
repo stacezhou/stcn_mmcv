@@ -113,6 +113,7 @@ class BatchSampler(Sampler[List[int]]):
             batch.append(ids)
             if len(batch) == self.batch_size:
                 yield [i for ids in batch for i in ids]
+                batch = []
         if len(batch) > 0 and not self.drop_last:
             yield [i for ids in batch for i in ids]
     def __len__(self):

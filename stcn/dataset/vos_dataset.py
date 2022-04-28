@@ -91,27 +91,12 @@ class VOSTrainDataset(Dataset):
         self.max_nums_frame = max(all_nums_frames) 
         assert min(all_nums_frames)  > self.min_length, 'too big min_skip'
         self.test_mode = test_mode
-        # self._set_group_flag()
 
         self.nums_objs = [self.data_infos[v]['nums_obj'] for v in self.videos]
         
         
-
-    # def _set_group_flag(self):
-    #     """Set flag according to image aspect ratio.
-
-    #     Images with aspect ratio greater than 1 will be set as group 1,
-    #     otherwise group 0.
-    #     """
-    #     self.flag = np.zeros(len(self), dtype=np.uint8)
-    #     for i,v in enumerate(self.videos):
-    #         H = self.data_infos[v]['img_height']
-    #         W = self.data_infos[v]['img_width']
-    #         if H / W > 1:
-    #             self.flag[i] = 1
-        
     def __len__(self):
-        self.max_nums_frame * len(self.videos)
+        return self.max_nums_frame * len(self.videos)
 
     
     # def _random_choose_frames(self,frame_list):
@@ -134,22 +119,6 @@ class VOSTrainDataset(Dataset):
             return self.prepare_train_data(index)
         else:
             return self.prepare_test_data(index)
-        # chosen_frames = self._random_choose_frames(frames)
-        # # chosen_frames = frames[:self.num_frames]
-        # data_batch = []
-        # for i,(image,mask) in enumerate(chosen_frames):
-        #     data = {
-        #         'img_prefix' : self.image_root,
-        #         'img_info':{'filename': image},
-        #         'ann_info': {
-        #             'masks' : str(Path(self.mask_root) / mask) ,
-        #             'flag'  : 'new_video' if i == 0 else ''
-        #             },
-        #     }
-        #     data = self.pipeline(data)
-        #     data_batch.append(data)
-
-        # return data_batch
     
     def prepare_train_data(self, index):
         v_id = index // self.max_nums_frame
@@ -158,8 +127,8 @@ class VOSTrainDataset(Dataset):
         flag = 'new_video' if f_id == 0 else ''
         v_l = self.data_infos[v]['nums_frame']
         if f_id >= v_l: # 0,1,2,3, 2,1,0, 1,2,3, 2,1,0, 1,2,3
-            x = (f_id - v_l) // (self.max_nums_frame - 1)
-            f_id = (f_id - v_l) % (self.max_nums_frame - 1)
+            x = (f_id - v_l) // (v_l - 1)
+            f_id = (f_id - v_l) % (v_l - 1)
             if x % 2 == 0:
                 f_id -= 2
             else:
@@ -179,29 +148,3 @@ class VOSTrainDataset(Dataset):
     
     def prepare_test_data(self, index):
         pass
-
-
-
-@DATASETS.register_module()
-class VOSTestDataset(Dataset):
-
-    def __init__(self, image_root, ref_mask_root, gt_mask_root = None, pipeline = None):
-        self.videos = listdir(image_root)
-        self.mask_root = ref_mask_root
-        self.gt_mask_root = gt_mask_root
-        self.pipeline = pipeline
-        self.has_read_frames = False
-
-    def read_frames(self):
-        if self.has_read_frames:
-            return
-        self.frames = None
-        pass 
-
-    def __len__(self):
-        self.read_frames()
-        return len(self.videos)
-
-    def __getitem__(self, index):
-        self.read_frames()
-        return self.frames[index]
