@@ -23,6 +23,8 @@ if platform.system() != 'Windows':
 def build_dataloader(dataset,
                      samples_per_gpu,
                      workers_per_gpu,
+                     max_objs_per_gpu,
+                     nums_frame,
                      num_gpus=1,
                      dist=True,
                      shuffle=True,
@@ -71,11 +73,11 @@ def build_dataloader(dataset,
         num_workers = num_gpus * workers_per_gpu
 
     assert runner_type != 'IterBasedRunner'
-    sampler = DistributedGroupSampler(
-                dataset, samples_per_gpu, world_size, rank, seed=seed)
+    sampler = DistributedGroupSampler( dataset, samples_per_gpu, world_size, rank,
+        seed=seed, max_objs_per_gpu=max_objs_per_gpu)
     batch_sampler = BatchSampler(sampler=sampler,
-                    batch_size=samples_per_gpu,
-                    drop_last=True)
+                    T_batch_size=nums_frame,
+                    drop_last=False)
 
     init_fn = partial(
         worker_init_fn, num_workers=num_workers, rank=rank,
@@ -90,11 +92,9 @@ def build_dataloader(dataset,
 
     data_loader = DataLoader(
         dataset,
-        batch_size=batch_size,
-        sampler=sampler,
         num_workers=num_workers,
         batch_sampler=batch_sampler,
-        collate_fn=partial(collate, samples_per_gpu=samples_per_gpu),
+        collate_fn=partial(collate, samples_per_gpu=samples_per_gpu * nums_frame),
         pin_memory=False,
         worker_init_fn=init_fn,
         **kwargs)

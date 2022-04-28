@@ -34,6 +34,7 @@ class STCN(BaseModule):
                 memory,
                 loss_fn,
                 seg_background = False,
+                batch_size = 2,
                 init_cfg=None):
         super().__init__(init_cfg)
         self.key_encoder = VOSMODEL.build(key_encoder)
@@ -42,6 +43,7 @@ class STCN(BaseModule):
         self.memory = VOSMODEL.build(memory)
         self.loss_fn = LOSSES.build(loss_fn)
         self.use_bg = seg_background
+        self.batch_size = batch_size
         self.targets = []
     
     def update_targets(self, new_objs, batch_size):
@@ -134,9 +136,11 @@ class STCN(BaseModule):
 
     def train_step(self, data_batch, optimizer, **kw):
         output = defaultdict(list)
-        for i,data in enumerate(data_batch):
-            img = data['img'].data
-            gt_mask = data['gt_mask'].data
+        step = self.batch_size
+        for i in range(0,len(data_batch['img']),step):
+            img = data_batch['img'][i:i+step]
+            gt_mask = data_batch['gt_mask'][i:i+step]
+            img_metas = data_batch['img_metas'][i:i+step]
             flag = 'new_video' if i == 0 else ''
             output[i] = self.forward(
                     img = img,

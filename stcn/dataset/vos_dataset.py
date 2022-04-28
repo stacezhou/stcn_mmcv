@@ -87,9 +87,9 @@ class VOSTrainDataset(Dataset):
         self.num_frames = num_frames
         self.min_length = min_skip * (num_frames -1) + 1
 
-        nums_frames = [v['nums_frame'] for k,v in self.data_infos.items()]
-        self.max_nums_frame = max(num_frames) 
-        assert min(nums_frames)  > self.min_length, 'too big min_skip'
+        all_nums_frames = [v['nums_frame'] for k,v in self.data_infos.items()]
+        self.max_nums_frame = max(all_nums_frames) 
+        assert min(all_nums_frames)  > self.min_length, 'too big min_skip'
         self.test_mode = test_mode
         # self._set_group_flag()
 
@@ -167,11 +167,11 @@ class VOSTrainDataset(Dataset):
                 
         image, mask = self.data_infos[v]['frame_and_mask'][f_id]
         data = {
+            'flag'  : flag,
             'img_prefix' : self.image_root,
             'img_info':{'filename': image},
             'ann_info': {
                 'masks' : str(Path(self.mask_root) / mask) ,
-                'flag'  : flag,
                 },
         }
         data = self.pipeline(data)

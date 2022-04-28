@@ -14,7 +14,7 @@ class DistributedGroupSampler(Sampler):
                  samples_per_gpu=1,
                  num_replicas=None,
                  rank=None,
-                 max_objs_per_gpu=4,
+                 max_objs_per_gpu=16,
                  seed=0):
         _rank, _num_replicas = get_dist_info()
         if num_replicas is None:
@@ -39,23 +39,27 @@ class DistributedGroupSampler(Sampler):
         # deterministically shuffle based on epoch
         g = torch.Generator()
         g.manual_seed(self.epoch + self.seed)
+
         n_vi_dict = defaultdict(list)
-        for vi,n in self.dataset.nums_objs:
-            self.flag[n].append(vi)
+        for vi,n in enumerate(self.dataset.nums_objs):
+            n_vi_dict[n].append(vi)
         # todo random shuffle
-        n_vi = [(n,vi) for n,vis in n_vi_dict.items() for vi in vis]
-        N = [n for n,vi in n_vi]
-        I = [vi for n,vi in n_vi]
+        N = []
+        I = []
+        for n in list(n_vi_dict.keys()):
+            for i in n_vi_dict[n]:
+                N.append(n)
+                I.append(i)
 
         r = len(N) - 1
-        S = N[r] + N[0] * (self.samples_per_gpu)
+        step = self.samples_per_gpu - 1
+        S = N[r] + N[0] * step
         while S > self.max_objs_per_gpu and r:
             r -= 1
-            S = N[r] + N[0] * (self.samples_per_gpu)
+            S = N[r] + N[0] * step
         assert r, 'max_objs_per_gpu is too small'
 
         I_groups = []
-        step = self.samples_per_gpu - 1
         l = step
         while l < r:
             S = N[r] + sum([N[max(l-i,0)] for i in range(step)])
@@ -98,12 +102,18 @@ class DistributedGroupSampler(Sampler):
 
 class BatchSampler(Sampler[List[int]]):
 
-    def __init__(self, sampler: Sampler[int], batch_size: int, drop_last: bool) -> None:
+    def __init__(self, sampler: Sampler[int], T_batch_size: int, drop_last: bool) -> None:
         self.sampler = sampler
+        self.batch_size = T_batch_size
+        self.drop_last = drop_last
 
     def __iter__(self):
-        for batch in self.sampler:
-            yield batch
-
+        batch = []
+        for ids in self.sampler:
+            batch.append(ids)
+            if len(batch) == self.batch_size:
+                yield [i for ids in batch for i in ids]
+        if len(batch) > 0 and not self.drop_last:
+            yield [i for ids in batch for i in ids]
     def __len__(self):
         return len(self.sampler)
