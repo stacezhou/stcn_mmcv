@@ -16,7 +16,7 @@ pipeline= [
     dict(type='SafeCollect', keys=['img', 'gt_mask'], ),
 ]
 data = dict(
-    type='VOSTrainDataset',
+    type='VOSDataset',
     pipeline = pipeline,
     image_root = '/data/DAVIS/2017/trainval/JPEGImages/480p',
     mask_root = '/data/DAVIS/2017/trainval/Annotations/480p',

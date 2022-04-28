@@ -1,6 +1,5 @@
 from stcn.para import get_config
 from stcn.trainer import train_model
-# from mmdet.apis.train import train_detector as train_model
 from stcn import VOSMODEL
 from mmdet.datasets import DATASETS
 

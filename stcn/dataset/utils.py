@@ -1,6 +1,4 @@
-from os import path as osp
 from pathlib import Path
-import mmcv
 from PIL import Image
 import numpy as np
 

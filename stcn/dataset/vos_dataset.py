@@ -1,6 +1,6 @@
 from torch.utils.data import Dataset
 from pathlib import Path
-from random import randint
+from random import randint,choice
 from mmdet.datasets.pipelines import Compose
 from mmdet.datasets import DATASETS
 import mmcv
@@ -65,11 +65,10 @@ class StaticDataset(Dataset):
         return output
 
 @DATASETS.register_module()
-class VOSTrainDataset(Dataset):
-    def __init__(self, image_root, mask_root, pipeline=[],repeat_dataset = 1, max_skip=10, num_frames=3, min_skip=1, test_mode=False, **kw):
+class VOSDataset(Dataset):
+    def __init__(self, image_root, mask_root, pipeline=[],max_skip=10, num_frames=3, max_objs_per_frame = 2, min_skip=1, test_mode=False, **kw):
 
         self.pipeline = Compose(pipeline)
-        self.repeat = repeat_dataset
 
         self.image_root = image_root
         self.mask_root = mask_root
@@ -91,8 +90,11 @@ class VOSTrainDataset(Dataset):
         self.max_nums_frame = max(all_nums_frames) 
         assert min(all_nums_frames)  > self.min_length, 'too big min_skip'
         self.test_mode = test_mode
+        self.max_objs_per_frame = max_objs_per_frame
 
         self.nums_objs = [self.data_infos[v]['nums_obj'] for v in self.videos]
+
+        self.seed = 0
         
         
     def __len__(self):
@@ -133,10 +135,12 @@ class VOSTrainDataset(Dataset):
                 f_id -= 2
             else:
                 f_id += 1
-                
+        
+        
         image, mask = self.data_infos[v]['frame_and_mask'][f_id]
         data = {
             'flag'  : flag,
+            'labels' : self.data_infos[v]['labels'],
             'img_prefix' : self.image_root,
             'img_info':{'filename': image},
             'ann_info': {
