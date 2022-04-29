@@ -47,6 +47,12 @@ class STCN(BaseModule):
         self.sentry = Parameter(torch.Tensor(0))
         self.targets = []
     
+    def train(self, mode=True):
+        self.memory.train(False)
+        super().train(mode)
+
+    def eval(self):
+        self.train(False)
 
     def forward(self,img, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
         pred_mask = None
@@ -104,6 +110,9 @@ class STCN(BaseModule):
                 #! pred mask
                 out_mask = self.compute_label(mask[oii])
                 out_mask = out_mask.cpu().numpy().astype(np.uint8).squeeze(0)
+                out_masks.append(out_mask)
+            if len(out_masks) == 0:
+                out_mask = np.zeros((img_metas[0]['img_shape'][:2])).astype(np.uint8)
                 out_masks.append(out_mask)
                 
             output = {'mask': out_masks, 'img_metas': img_metas}

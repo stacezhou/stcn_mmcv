@@ -50,6 +50,12 @@ model = dict(
         type = 'MaskDecoder',
         indim = 512,
     ),
-    memory = dict(type= 'AffinityMemoryBank'),
+    memory = dict(
+            type= 'AffinityMemoryBank',
+            # top_k = 3000,
+            top_k = 2000,
+            mem_every = 5,
+            include_last = True,
+    ),
     loss_fn = dict(type = 'BootstrappedCE'),
 )

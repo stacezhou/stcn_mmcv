@@ -8,7 +8,7 @@ from .utils import generate_meta
 
 @DATASETS.register_module()
 class VOSDataset(Dataset):
-    def __init__(self, image_root, mask_root, pipeline=[],
+    def __init__(self, image_root, mask_root, pipeline=[], valid_mask_root = None,
         frame_limit = 20, palette = None,
         wo_mask_pipeline = [], max_objs_per_frame = 2, test_mode=False, **kw):
 
