@@ -55,6 +55,8 @@ class STCN(BaseModule):
         self.train(False)
 
     def forward(self,img, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
+        if img is None:
+            return []
         pred_mask = None
         new_gt_mask = None
         #! encode key

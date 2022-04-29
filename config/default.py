@@ -75,7 +75,8 @@ data = dict(
         pipeline = test_vos_pipeline,
         wo_mask_pipeline = wo_mask_pipeline,
         image_root = '/data/YouTube/valid/JPEGImages',
-        valid_mask_root = '/data/YouTube/valid/valid_Annotations',
+        mask_root = '/data/YouTube/valid/valid_Annotations',
+        palette = '/data/YouTube/valid/Annotations/0a49f5265b/00000.png',
     ),
     test = dict(
         type='VOSDataset',
@@ -84,7 +85,6 @@ data = dict(
         wo_mask_pipeline = wo_mask_pipeline,
         image_root = '/data/YouTube/valid/JPEGImages',
         mask_root = '/data/YouTube/valid/Annotations',
-        valid_mask_root = '/data/YouTube/valid/valid_Annotations',
         palette = '/data/YouTube/valid/Annotations/0a49f5265b/00000.png',
     ),
 )

@@ -8,7 +8,7 @@ from .utils import generate_meta
 
 @DATASETS.register_module()
 class VOSDataset(Dataset):
-    def __init__(self, image_root, mask_root, pipeline=[], valid_mask_root = None,
+    def __init__(self, image_root, mask_root, pipeline=[],
         frame_limit = 20, palette = None,
         wo_mask_pipeline = [], max_objs_per_frame = 2, test_mode=False, **kw):
 
@@ -83,7 +83,7 @@ class VOSDataset(Dataset):
         flag = 'new_video' if f_id == 0 else ''
         v_l = self.data_infos[v]['nums_frame']
         if f_id >= v_l: # 0,1,2,3, 2,1,0, 1,2,3, 2,1,0, 1,2,3
-            return {}
+            return {'img':None}
         
         
         image, mask = self.data_infos[v]['frame_and_mask'][f_id]
