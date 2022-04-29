@@ -3,7 +3,7 @@ import torch
 from stcn.para import get_config
 from stcn import VOSMODEL
 from stcn.dataset.dataloader import build_dataloader
-from mmdet.datasets import DATASETS
+from mmdet.datasets import DATASETS,build_dataset
 from mmcv.runner import (get_dist_info, load_checkpoint, wrap_fp16_model)
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from PIL import Image
@@ -28,7 +28,7 @@ def test_dataset(model, data_loader, output_dir):
         img_metas = data['img_metas'].data[0]
         output = model(img=img,gt_mask=gt_mask,img_metas=img_metas,return_loss = False)
 
-        mask = output['mask'][0]
+        mask = output[0]['mask'][0]
         filename = output['img_metas'][0]['ori_filename']
         out_path = Path(output_dir) / 'Annotations' / (filename[:-4] + '.png')
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -46,7 +46,7 @@ def main():
     wrap_fp16_model(model)
     load_checkpoint(model, cfg.load_from)
 
-    dataset = DATASETS.build(cfg.data.test)
+    dataset = build_dataset(cfg.data.test)
     data_loader = build_dataloader(
             dataset,
             samples_per_gpu=1,

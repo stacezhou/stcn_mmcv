@@ -115,7 +115,7 @@ class STCN(BaseModule):
                 out_mask = np.zeros((img_metas[0]['img_shape'][:2])).astype(np.uint8)
                 out_masks.append(out_mask)
                 
-            output = {'mask': out_masks, 'img_metas': img_metas}
+            output = [{'mask': out_masks, 'img_metas': img_metas}]
 
         return output
 
