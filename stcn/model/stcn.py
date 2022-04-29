@@ -54,7 +54,7 @@ class STCN(BaseModule):
     def eval(self):
         self.train(False)
 
-    def forward(self,img, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
+    def forward(self,img=None, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
         if img is None:
             return []
         pred_mask = None

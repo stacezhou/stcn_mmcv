@@ -83,7 +83,7 @@ class VOSDataset(Dataset):
         flag = 'new_video' if f_id == 0 else ''
         v_l = self.data_infos[v]['nums_frame']
         if f_id >= v_l: # 0,1,2,3, 2,1,0, 1,2,3, 2,1,0, 1,2,3
-            return {'img':None}
+            return {}
         
         
         image, mask = self.data_infos[v]['frame_and_mask'][f_id]
@@ -102,3 +102,6 @@ class VOSDataset(Dataset):
         else:
             data = self.pipeline(data)
         return data
+
+    def evaluate(self, results, logger, **kwargs):
+        pass
