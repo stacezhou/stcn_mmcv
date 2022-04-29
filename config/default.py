@@ -74,8 +74,8 @@ data = dict(
         test_mode = True,
         pipeline = test_vos_pipeline,
         wo_mask_pipeline = wo_mask_pipeline,
-        image_root = '/data/YouTube/valid/JPEGImages',
-        mask_root = '/data/YouTube/valid/valid_Annotations',
+        image_root = '/data/YouTube/debug/JPEGImages',
+        mask_root = '/data/YouTube/debug/valid_Annotations',
         palette = '/data/YouTube/valid/Annotations/0a49f5265b/00000.png',
     ),
     test = dict(

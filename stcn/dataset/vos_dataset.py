@@ -104,4 +104,6 @@ class VOSDataset(Dataset):
         return data
 
     def evaluate(self, results, logger, **kwargs):
+        # for name, val in eval_res.items():
+        #     runner.log_buffer.output[name] = val
         pass

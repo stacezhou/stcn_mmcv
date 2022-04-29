@@ -56,7 +56,7 @@ class STCN(BaseModule):
 
     def forward(self,img=None, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
         if img is None:
-            return []
+            return [None]
         pred_mask = None
         new_gt_mask = None
         #! encode key
@@ -117,7 +117,7 @@ class STCN(BaseModule):
                 out_mask = np.zeros((img_metas[0]['img_shape'][:2])).astype(np.uint8)
                 out_masks.append(out_mask)
                 
-            output = [{'mask': out_masks, 'img_metas': img_metas}]
+            output = out_masks
 
         return output
 

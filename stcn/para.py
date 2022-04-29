@@ -17,6 +17,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
     parser.add_argument('config', help='train config file path')
     parser.add_argument('--work-dir', help='the dir to save logs and models')
+    parser.add_argument('--out-dir', help='the dir to save output masks')
     parser.add_argument(
         '--resume-from', help='the checkpoint file to resume from')
     parser.add_argument(
@@ -119,6 +120,9 @@ def get_config():
         cfg.resume_from = args.resume_from
     if args.load_from is not None:
         cfg.load_from = args.load_from
+    if args.out_dir is not None:
+        cfg.out_dir  = args.out_dir
+
     if args.no_validate:
         cfg.validate = False
     elif cfg.data.get('val',None) is not None:

@@ -9,10 +9,12 @@ from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import (DistSamplerSeedHook, EpochBasedRunner,
                          Fp16OptimizerHook, OptimizerHook, build_optimizer,
                          build_runner, get_dist_info)
-from mmdet.core import DistEvalHook, EvalHook
+from mmcv.runner import DistEvalHook, EvalHook
 from mmdet.utils import find_latest_checkpoint, get_root_logger
 from .dataset.dataloader import build_dataloader
 from mmdet.datasets import build_dataset
+from .testor import multi_gpu_test
+from functools import partial
 
 def init_random_seed(seed=None, device='cuda'):
     """Initialize random seed.
@@ -188,8 +190,13 @@ def train_model(model,
         eval_hook = DistEvalHook if distributed else EvalHook
         # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
+        if cfg.get('out_dir',None) is not None:
+            test_fn = partial(multi_gpu_test, out_dir=cfg.out_dir,do_evaluate = True)
+        else:
+            test_fn = partial(multi_gpu_test, do_evaluate = True)
+
         runner.register_hook(
-            eval_hook(val_dataloader, **eval_cfg), priority='LOW')
+            eval_hook(val_dataloader,test_fn=test_fn, **eval_cfg), priority='LOW')
 
     resume_from = None
     if cfg.resume_from is None and cfg.get('auto_resume'):
