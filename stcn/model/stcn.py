@@ -3,6 +3,7 @@ from mmcv.utils import Registry
 from collections import defaultdict
 from mmdet.models import BACKBONES, LOSSES
 from torch.nn import Parameter
+import numpy as np
 import torch
 
 VOSMODEL = Registry('vos_model')
@@ -102,6 +103,7 @@ class STCN(BaseModule):
 
                 #! pred mask
                 out_mask = self.compute_label(mask[oii])
+                out_mask = out_mask.cpu().numpy().astype(np.uint8).squeeze(0)
                 out_masks.append(out_mask)
                 
             output = {'mask': out_masks, 'img_metas': img_metas}
@@ -111,6 +113,7 @@ class STCN(BaseModule):
     def train_step(self, data_series, optimizer, batch_size = None,**kw):
         output = defaultdict(list)
         step = batch_size
+        # todo 当 labels 个数超过上限后， 随机抑制 labels
         for i in range(0,len(data_series['img']),step):
             img = data_series['img'][i:i+step]
             gt_mask = data_series['gt_mask'][i:i+step]
@@ -183,5 +186,5 @@ class STCN(BaseModule):
         if not self.use_bg:
             bg_mask = compute_bg_prob(p_mask)
             p_mask = torch.cat([bg_mask, p_mask], dim=0)
-        out_mask_label = torch.topk(p_mask, 1,dim=0)[1].squeeze(0)
+        out_mask_label = torch.argmax(p_mask, dim=0)
         return out_mask_label

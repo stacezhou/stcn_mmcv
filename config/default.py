@@ -76,6 +76,7 @@ data = dict(
         test_mode = True,
         image_root = '/data/YouTube/valid/JPEGImages',
         mask_root = '/data/YouTube/valid/Annotations',
+        palette = '/data/YouTube/valid/Annotations/0a49f5265b/00000.png',
     ),
 )
 
