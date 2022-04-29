@@ -50,6 +50,7 @@ class STCN(BaseModule):
     def forward(self,img, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
         pred_mask = None
         new_gt_mask = None
+        #! encode key
         K, feats = self.key_encoder(img) 
 
         if img_metas[0]['flag'] == 'new_video':
@@ -58,7 +59,9 @@ class STCN(BaseModule):
             self.oi_groups = []
         
         if self.memory.is_init:
+            #! read memory
             V = self.memory.read(K)
+            #! deocde mask
             pred_logits, pred_mask = self.mask_decoder(V, feats, self.fi_list)
 
         if gt_mask is not None:
@@ -67,7 +70,9 @@ class STCN(BaseModule):
 
         mask = safe_torch_cat([pred_mask, new_gt_mask],dim=0)
         if mask is not None:
+            #! encode mask
             V = self.value_encoder(mask, feats, self.fi_list)
+            #! write memory
             self.memory.write(K, V)
 
         if return_loss:
@@ -83,6 +88,7 @@ class STCN(BaseModule):
                     bg_logits = compute_bg_logits(logits)
                     logits = torch.cat([bg_logits, logits], dim=0)
 
+                #! compute loss
                 loss += self.loss_fn(logits.swapaxes(0,1), cls_gt)
             output = {
                 'loss': loss,
@@ -94,6 +100,7 @@ class STCN(BaseModule):
                 if len(oii) == 0:
                     continue
 
+                #! pred mask
                 out_mask = self.compute_label(mask[oii])
                 out_masks.append(out_mask)
                 
@@ -101,13 +108,13 @@ class STCN(BaseModule):
 
         return output
 
-    def train_step(self, data_batch, optimizer, batch_size = None,**kw):
+    def train_step(self, data_series, optimizer, batch_size = None,**kw):
         output = defaultdict(list)
         step = batch_size
-        for i in range(0,len(data_batch['img']),step):
-            img = data_batch['img'][i:i+step]
-            gt_mask = data_batch['gt_mask'][i:i+step]
-            img_metas = data_batch['img_metas'][i:i+step]
+        for i in range(0,len(data_series['img']),step):
+            img = data_series['img'][i:i+step]
+            gt_mask = data_series['gt_mask'][i:i+step]
+            img_metas = data_series['img_metas'][i:i+step]
             flag = 'new_video' if i == 0 else ''
             img_metas[0]['flag'] = flag
             output[i] = self.forward(

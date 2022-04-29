@@ -65,6 +65,7 @@ data = dict(
         max_skip=10,
         min_skip=1,
         pipeline = train_vos_pipeline,
+        frame_limit = 20,
         image_root = '/data/YouTube/train_480p/JPEGImages',
         mask_root = '/data/YouTube/train_480p/Annotations',
     ),
