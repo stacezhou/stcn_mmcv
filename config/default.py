@@ -69,11 +69,19 @@ data = dict(
         image_root = '/data/YouTube/train_480p/JPEGImages',
         mask_root = '/data/YouTube/train_480p/Annotations',
     ),
-    test = dict(
+    val = dict(
         type='VOSDataset',
+        test_mode = True,
         pipeline = test_vos_pipeline,
         wo_mask_pipeline = wo_mask_pipeline,
+        image_root = '/data/YouTube/valid/JPEGImages',
+        valid_mask_root = '/data/YouTube/valid/valid_Annotations',
+    ),
+    test = dict(
+        type='VOSDataset',
         test_mode = True,
+        pipeline = test_vos_pipeline,
+        wo_mask_pipeline = wo_mask_pipeline,
         image_root = '/data/YouTube/valid/JPEGImages',
         mask_root = '/data/YouTube/valid/Annotations',
         valid_mask_root = '/data/YouTube/valid/valid_Annotations',

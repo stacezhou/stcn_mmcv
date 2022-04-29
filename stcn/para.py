@@ -119,6 +119,10 @@ def get_config():
         cfg.resume_from = args.resume_from
     if args.load_from is not None:
         cfg.load_from = args.load_from
+    if args.no_validate:
+        cfg.validate = False
+    elif cfg.data.get('val',None) is not None:
+        cfg.validate = True
     cfg.auto_resume = args.auto_resume
     if args.gpus is not None:
         cfg.gpu_ids = range(1)

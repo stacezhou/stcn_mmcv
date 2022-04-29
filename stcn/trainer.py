@@ -9,9 +9,10 @@ from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import (DistSamplerSeedHook, EpochBasedRunner,
                          Fp16OptimizerHook, OptimizerHook, build_optimizer,
                          build_runner, get_dist_info)
-
+from mmdet.core import DistEvalHook, EvalHook
 from mmdet.utils import find_latest_checkpoint, get_root_logger
 from .dataset.dataloader import build_dataloader
+from mmdet.datasets import build_dataset
 
 def init_random_seed(seed=None, device='cuda'):
     """Initialize random seed.
@@ -98,7 +99,7 @@ def train_model(model,
             cfg.data.samples_per_gpu,
             cfg.data.workers_per_gpu,
             cfg.data.nums_frame,
-            sample_config = cfg.data.sampler,
+            sampler_config = cfg.data.sampler,
             # `num_gpus` will be ignored if distributed
             num_gpus=len(cfg.gpu_ids),
             dist=distributed,
@@ -171,6 +172,24 @@ def train_model(model,
         if isinstance(runner, EpochBasedRunner):
             runner.register_hook(DistSamplerSeedHook())
 
+    # register eval hooks
+    if validate:
+        # Support batch_size > 1 in validation
+        val_samples_per_gpu = cfg.data.val.pop('samples_per_gpu', 1)
+        val_dataset = build_dataset(cfg.data.val, dict(test_mode=True))
+        val_dataloader = build_dataloader(
+            val_dataset,
+            samples_per_gpu=val_samples_per_gpu,
+            workers_per_gpu=cfg.data.workers_per_gpu,
+            nums_frame=1,
+            dist=distributed,
+            shuffle=False)
+        eval_cfg = cfg.get('evaluation', {})
+        eval_hook = DistEvalHook if distributed else EvalHook
+        # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
+        # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
+        runner.register_hook(
+            eval_hook(val_dataloader, **eval_cfg), priority='LOW')
 
     resume_from = None
     if cfg.resume_from is None and cfg.get('auto_resume'):
