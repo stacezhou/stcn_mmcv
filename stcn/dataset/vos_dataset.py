@@ -8,7 +8,9 @@ from .utils import generate_meta
 
 @DATASETS.register_module()
 class VOSDataset(Dataset):
-    def __init__(self, image_root, mask_root, pipeline=[],wo_mask_pipeline = [], max_skip=10, num_frames=3, max_objs_per_frame = 2, min_skip=1, test_mode=False, **kw):
+    def __init__(self, image_root, mask_root, pipeline=[],
+        frame_limit = 20,
+        wo_mask_pipeline = [], num_frames=3, max_objs_per_frame = 2, test_mode=False, **kw):
 
         self.pipeline = Compose(pipeline)
         self.wo_mask_pipeline = Compose(wo_mask_pipeline)
@@ -24,13 +26,9 @@ class VOSDataset(Dataset):
             mmcv.dump(self.data_infos, meta_stcn)
         self.videos = sorted(list(self.data_infos.keys()))
 
-        self.min_skip = min_skip
-        self.max_skip = max_skip
-        self.num_frames = num_frames
-        self.min_length = min_skip * (num_frames -1) + 1
-
         all_nums_frames = [v['nums_frame'] for k,v in self.data_infos.items()]
-        self.max_nums_frame = max(all_nums_frames) 
+        video_max_nums_frame = max(all_nums_frames) 
+        self.max_nums_frame = min(video_max_nums_frame, frame_limit) 
         assert min(all_nums_frames)  > self.min_length, 'too big min_skip'
         self.test_mode = test_mode
         self.max_objs_per_frame = max_objs_per_frame
@@ -43,20 +41,6 @@ class VOSDataset(Dataset):
     def __len__(self):
         return self.max_nums_frame * len(self.videos)
 
-    # def _random_choose_frames(self,frame_list):
-    #     assert self.num_frames < len(frame_list)
-    #     offset = [0]
-    #     flex_quota = len(frame_list) - self.min_length 
-    #     start_idx = randint(0, flex_quota)
-    #     flex_quota -= (start_idx - self.min_skip)
-    #     for i in range(self.num_frames - 1):
-    #         plus = min(self.max_skip, flex_quota)
-    #         fq = randint(self.min_skip,plus) 
-    #         flex_quota -= (fq - self.min_skip)
-    #         offset.append(offset[-1] + fq)
- 
-    #     frames = [frame_list[start_idx + i] for i in offset]
-    #     return frames
 
     def __getitem__(self, index):
         if not self.test_mode:

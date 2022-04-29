@@ -23,13 +23,11 @@ if platform.system() != 'Windows':
 def build_dataloader(dataset,
                      samples_per_gpu,
                      workers_per_gpu,
-                     max_objs_per_gpu,
                      nums_frame,
                      num_gpus=1,
                      dist=True,
-                     shuffle=True,
                      seed=None,
-                     runner_type='EpochBasedRunner',
+                     sampler_config = {},
                      persistent_workers=False,
                      **kwargs):
     """Build PyTorch DataLoader.
@@ -75,9 +73,14 @@ def build_dataloader(dataset,
     if dataset.test_mode:
         samples_per_gpu = 1
         nums_frame = 1
-        shuffle = False
-    sampler = DistributedGroupSampler( dataset, samples_per_gpu, world_size, rank,
-        seed=seed, max_objs_per_gpu=max_objs_per_gpu)
+
+    sampler = DistributedGroupSampler(
+        dataset, 
+        samples_per_gpu, 
+        world_size, rank,
+        seed=seed, 
+        **sampler_config,
+        )
     batch_sampler = BatchSampler(sampler=sampler,
                     T_batch_size=nums_frame,
                     drop_last=False)

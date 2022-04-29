@@ -52,7 +52,14 @@ data = dict(
     workers_per_gpu = 0,
     samples_per_gpu = 2,
     max_objs_per_gpu = -1,
-    nums_frame = 3,
+    nums_frame = 4,
+    sampler = dict(
+        shuffle_videos = True,
+        random_skip = True,
+        max_skip = 10,
+        min_skip = 1,
+        max_objs_per_gpu=-1,
+    ),
     train = dict(
         type='VOSDataset',
         max_skip=10,

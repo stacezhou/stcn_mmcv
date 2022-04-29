@@ -4,18 +4,20 @@ import torch
 from mmcv.runner import get_dist_info
 from torch.utils.data import Sampler
 from typing import  List, TypeVar
+import random
 
 T_co = TypeVar('T_co', covariant=True)
 
-def compact_to(target, avi_nums, times, top=True):
-    if times == 1:
-        for n in avi_nums:
+def compact_to(target, options, nums, top=True):
+    'target: 10, options: 5,4,3,2, nums: 3 --> [5,3,2]'
+    if nums == 1:
+        for n in options:
             if n == target:
                 return [n]
         return [None]
 
-    for n in avi_nums:
-        output = compact_to(target - n, avi_nums, times - 1, False)
+    for n in options:
+        output = compact_to(target - n, options, nums - 1, False)
         if None not in output:
             return [n, *output]
 
@@ -28,7 +30,11 @@ class DistributedGroupSampler(Sampler):
                  samples_per_gpu=1,
                  num_replicas=None,
                  rank=None,
+                 shuffle_videos = False,
+                 random_skip = False,
                  max_objs_per_gpu=-1,
+                 max_skip = 10,
+                 min_skip = 1,
                  seed=0):
         _rank, _num_replicas = get_dist_info()
         if num_replicas is None:
@@ -41,17 +47,19 @@ class DistributedGroupSampler(Sampler):
         self.rank = rank
         self.epoch = 0
         self.seed = seed if seed is not None else 0
-
-        assert hasattr(self.dataset, 'max_nums_frame')
-        assert hasattr(self.dataset, 'nums_objs')
-
+        self.shuffle_videos = shuffle_videos
+        self.random_skip = random_skip
+        self.max_skip = max_skip
+        self.min_skip = min_skip
+        self.nums_objs = self.dataset.nums_objs
         self.M = self.dataset.max_nums_frame
+
         if self.dataset.test_mode:
             self.indices = [[x] for x in list(range(len(self.dataset)))]
-            self.num_samples =  (len(self.dataset.nums_objs) // self.num_replicas + 1 ) * self.dataset.max_nums_frame
+            self.num_samples =  (len(self.nums_objs) // self.num_replicas + 1 ) * self.dataset.max_nums_frame
         else:
-            m = len(self.dataset.nums_objs) // 2
-            median = sorted(self.dataset.nums_objs)[m]
+            m = len(self.nums_objs) // 2
+            median = sorted(self.nums_objs)[m]
             if max_objs_per_gpu == -1:
                 max_objs_per_gpu = median * self.samples_per_gpu
             self.max_objs_per_gpu = max_objs_per_gpu
@@ -62,11 +70,15 @@ class DistributedGroupSampler(Sampler):
         # deterministically shuffle based on epoch
         g = torch.Generator()
         g.manual_seed(self.epoch + self.seed)
+        random.seed(self.epoch + self.seed)
 
-        n_vi_dict = defaultdict(list)
-        for vi,n in enumerate(self.dataset.nums_objs):
+        n_vi_dict = defaultdict(list) # n vi : the video index is 'vi' and it has 'n' targets
+        for vi,n in enumerate(self.nums_objs):
             n_vi_dict[n].append(vi)
-        # todo random shuffle
+
+        if self.shuffle_videos:
+            for n,vis in n_vi_dict:
+                random.shuffle(vis)
 
         ns = sorted(list(n_vi_dict.keys()))
         target = self.max_objs_per_gpu
@@ -91,13 +103,25 @@ class DistributedGroupSampler(Sampler):
 
         print(n_vi_dict)
 
-        # todo shuffle
+        if self.shuffle_videos:
+            random.shuffle(I_groups)
+
         max_size = len(I_groups)  // self.num_replicas * self.num_replicas
         self.I_groups = I_groups[:max_size]
 
         indices_group = []
         for group in I_groups:
-            f_id_group = [list(range(i*self.M, (i+1)*self.M)) for i in group]
+            if self.random_skip:
+                f_id_group = []
+                for vi in group:
+                    f_ids = []
+                    f_id = vi * self.M
+                    for j in range(self.M):
+                        f_id = f_id + random.randint(self.min_skip, self.max_skip)
+                        f_ids.append(f_id)
+                    f_id_group.append(f_ids)
+            else:
+                f_id_group = [list(range(i*self.M, (i+1)*self.M)) for i in group]
             transposed = list(zip(*f_id_group))
             indices_group.append(transposed)
         
