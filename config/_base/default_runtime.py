@@ -1,7 +1,7 @@
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
-    interval=20,
+    interval=50,
     hooks=[
         dict(type='TextLoggerHook'),
         dict(type='TensorboardLoggerHook'),
@@ -19,5 +19,7 @@ opencv_num_threads = 0
 # set multi-process start method as `fork` to speed up the training
 mp_start_method = 'fork'
 evaluation = dict(
-    interval=1,
+    start=200,
+    save_best='mIoU',
+    interval=1000,
     by_epoch=False)

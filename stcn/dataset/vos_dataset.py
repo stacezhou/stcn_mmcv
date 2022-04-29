@@ -104,6 +104,12 @@ class VOSDataset(Dataset):
         return data
 
     def evaluate(self, results, logger, **kwargs):
-        # for name, val in eval_res.items():
-        #     runner.log_buffer.output[name] = val
-        pass
+        J = [x['J'].mean() for x in results if x is not None]
+        F = [x['F'].mean() for x in results if x is not None]
+        import numpy as np
+        J = np.array(J).mean()
+        F = np.array(F).mean()
+        return {
+            'mIoU':J,
+            'F':F
+        }
