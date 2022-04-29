@@ -9,11 +9,12 @@ from .utils import generate_meta
 @DATASETS.register_module()
 class VOSDataset(Dataset):
     def __init__(self, image_root, mask_root, pipeline=[],
-        frame_limit = 20,
+        frame_limit = 20, palette = None,
         wo_mask_pipeline = [], max_objs_per_frame = 2, test_mode=False, **kw):
 
         self.pipeline = Compose(pipeline)
         self.wo_mask_pipeline = Compose(wo_mask_pipeline)
+        
 
         self.image_root = image_root
         self.mask_root = mask_root
@@ -29,13 +30,13 @@ class VOSDataset(Dataset):
         all_nums_frames = [v['nums_frame'] for k,v in self.data_infos.items()]
         video_max_nums_frame = max(all_nums_frames) 
         self.max_nums_frame = min(video_max_nums_frame, frame_limit) 
-        assert min(all_nums_frames)  > self.min_length, 'too big min_skip'
         self.test_mode = test_mode
         self.max_objs_per_frame = max_objs_per_frame
 
         self.nums_objs = [self.data_infos[v]['nums_obj'] for v in self.videos]
 
         self.seed = 0
+        self.palette = palette
         
         
     def __len__(self):
@@ -54,14 +55,13 @@ class VOSDataset(Dataset):
         f_id = index % self.max_nums_frame
         flag = 'new_video' if f_id == 0 else ''
         v_l = self.data_infos[v]['nums_frame']
-        if f_id >= v_l: # 0,1,2,3, 2,1,0, 1,2,3, 2,1,0, 1,2,3
-            x = (f_id - v_l) // (v_l - 1)
-            f_id = (f_id - v_l) % (v_l - 1)
+        if f_id >= v_l: # 0,1,2,3, 2,1, 2,3, 2,1, 2,3
+            x = (f_id - v_l) // (v_l - 2)
+            f_id = (f_id - v_l) % (v_l - 2)
             if x % 2 == 0:
                 f_id -= 2
             else:
-                f_id += 1
-        
+                f_id += 2
         image, mask = self.data_infos[v]['frame_and_mask'][f_id]
         data = {
             'flag'  : flag,

@@ -49,10 +49,10 @@ class DistributedGroupSampler(Sampler):
         self.seed = seed if seed is not None else 0
         self.shuffle_videos = shuffle_videos
         self.random_skip = random_skip
-        self.max_skip = max_skip
         self.min_skip = min_skip
         self.nums_objs = self.dataset.nums_objs
         self.M = self.dataset.max_nums_frame
+        self.max_skip = max_skip
 
         if self.dataset.test_mode:
             self.indices = [[x] for x in list(range(len(self.dataset)))]
@@ -109,16 +109,27 @@ class DistributedGroupSampler(Sampler):
         max_size = len(I_groups)  // self.num_replicas * self.num_replicas
         self.I_groups = I_groups[:max_size]
 
+        def clamp(f_id, v_l):
+            if f_id >= v_l: # 0,1,2,3, 2,1, 2,3, 2,1, 2,3
+                x = (f_id - v_l) // (v_l - 2)
+                f_id = (f_id - v_l) % (v_l - 2)
+                if x % 2 == 0:
+                    f_id -= 2
+                else:
+                    f_id += 2
+            return f_id
+
         indices_group = []
         for group in I_groups:
             if self.random_skip:
                 f_id_group = []
                 for vi in group:
                     f_ids = []
-                    f_id = vi * self.M
+                    f_id = 0
                     for j in range(self.M):
                         f_id = f_id + random.randint(self.min_skip, self.max_skip)
                         f_ids.append(f_id)
+                    f_ids = [self.M + clamp(f,self.M) for f in f_ids]
                     f_id_group.append(f_ids)
             else:
                 f_id_group = [list(range(i*self.M, (i+1)*self.M)) for i in group]
