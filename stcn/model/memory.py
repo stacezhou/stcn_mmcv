@@ -5,7 +5,8 @@ import math
 
 @VOSMODEL.register_module()
 class AffinityMemoryBank():
-    def __init__(self) -> None:
+    def __init__(self, thin_reading_scale = 8) -> None:
+        self.thin_reading_scale = thin_reading_scale
         self.reset()
 
     def update_targets(self, fi_list):
@@ -25,7 +26,8 @@ class AffinityMemoryBank():
         self.Ks = []
         self.Vs = []
 
-    def read(self, K):
+    def _read(self, K):
+        B,Ck,h,w = K.shape
         Ks = self.Ks.flatten(start_dim=2) # B,C,THW
         K = K.flatten(start_dim=2) #B,C,HW
 
@@ -42,16 +44,26 @@ class AffinityMemoryBank():
         frame_affinity = x_exp / x_exp_sum  # B,THW,HW
         # del maxes,x_exp,x_exp_sum,ab,a_sq # save memory
 
-        N,C,T,H,W = self.Vs.shape
-        obj_affinity = frame_affinity[self.ii] # N,THW,HW
-        obj_affinity = obj_affinity.view((N,T,H*W*H*W)) * self.gate.unsqueeze(2)
-        obj_affinity = obj_affinity.view((N,T*H*W,H*W))
+        N,Cv,T,H,W = self.Vs.shape
+        gate = self.gate.view((N,T,1,1,1)).repeat(1,1,H,W,1).view((N,T*H*W,1))
+        obj_affinity = frame_affinity[self.ii] * gate # N,THW,HW
 
-        # del frame_affinity
+        del frame_affinity
 
         Vs = self.Vs.flatten(start_dim=2)
-        V = torch.bmm(Vs, obj_affinity).view_as(self.Vs[:,:,0])
+        V = torch.bmm(Vs, obj_affinity).view((N,Cv,h,w))
         return V
+    
+    def read(self, K):
+        # return self.Vs[:,:,0]
+        B,C,H,W = K.shape
+        step = (W+self.thin_reading_scale) // self.thin_reading_scale
+        V_ = []
+        for i in range(0,W,step):
+            V_.append(self._read(K[:,:,:,i:i+step]))
+        V = torch.cat(V_, dim=3)
+        return V
+
 
 
     def write(self,K,V):
