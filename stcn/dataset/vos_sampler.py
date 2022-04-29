@@ -144,9 +144,9 @@ class DistributedGroupSampler(Sampler):
 
 class BatchSampler(Sampler[List[int]]):
 
-    def __init__(self, sampler: Sampler[int], T_batch_size: int, drop_last: bool) -> None:
+    def __init__(self, sampler: Sampler[int], nums_frame: int, drop_last: bool) -> None:
         self.sampler = sampler
-        self.batch_size = T_batch_size
+        self.batch_size = nums_frame
         self.drop_last = drop_last
 
     def __iter__(self):

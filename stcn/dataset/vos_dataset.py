@@ -10,7 +10,7 @@ from .utils import generate_meta
 class VOSDataset(Dataset):
     def __init__(self, image_root, mask_root, pipeline=[],
         frame_limit = 20,
-        wo_mask_pipeline = [], num_frames=3, max_objs_per_frame = 2, test_mode=False, **kw):
+        wo_mask_pipeline = [], max_objs_per_frame = 2, test_mode=False, **kw):
 
         self.pipeline = Compose(pipeline)
         self.wo_mask_pipeline = Compose(wo_mask_pipeline)

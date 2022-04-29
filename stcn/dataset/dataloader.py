@@ -82,7 +82,7 @@ def build_dataloader(dataset,
         **sampler_config,
         )
     batch_sampler = BatchSampler(sampler=sampler,
-                    T_batch_size=nums_frame,
+                    nums_frame=nums_frame,
                     drop_last=False)
 
     init_fn = partial(
