@@ -2,6 +2,7 @@ from mmcv.runner import BaseModule
 from mmcv.utils import Registry
 from collections import defaultdict
 from mmdet.models import BACKBONES, LOSSES
+from torch.nn import Parameter
 import torch
 
 VOSMODEL = Registry('vos_model')
@@ -42,6 +43,7 @@ class STCN(BaseModule):
         self.memory = VOSMODEL.build(memory)
         self.loss_fn = LOSSES.build(loss_fn)
         self.use_bg = seg_background
+        self.sentry = Parameter(torch.Tensor(0))
         self.targets = []
     
 
@@ -69,10 +71,11 @@ class STCN(BaseModule):
             self.memory.write(K, V)
 
         if return_loss:
-            loss = 0
+            loss = torch.sum(self.sentry * 0)
             for oii in oi_groups:
                 if len(oii) == 0:
                     continue
+
                 cls_gt = self.compute_label(old_gt_mask[oii])
 
                 logits = pred_logits[oii]
@@ -121,7 +124,7 @@ class STCN(BaseModule):
             'num_samples': nums_frame,
             'log_vars' : {
                 'loss' : loss.detach().cpu(),
-                'mem_num_objs' : self.memory.gate.shape[0],
+                # 'mem_num_objs' : self.memory.gate.shape[0],
             }
         }
 
