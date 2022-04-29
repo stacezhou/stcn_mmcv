@@ -29,6 +29,7 @@ def build_dataloader(dataset,
                      seed=None,
                      sampler_config = {},
                      persistent_workers=False,
+                     runner_type='EpochBasedRunner',
                      **kwargs):
     """Build PyTorch DataLoader.
 

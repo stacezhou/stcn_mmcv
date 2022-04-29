@@ -77,7 +77,7 @@ class DistributedGroupSampler(Sampler):
             n_vi_dict[n].append(vi)
 
         if self.shuffle_videos:
-            for n,vis in n_vi_dict:
+            for n,vis in n_vi_dict.items():
                 random.shuffle(vis)
 
         ns = sorted(list(n_vi_dict.keys()))
