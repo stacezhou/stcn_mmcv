@@ -38,6 +38,23 @@ class SplitImgMask:
         return results
 
 
+from collections import namedtuple
+Mask = namedtuple('albu_mask','masks')
+@PIPELINES.register_module()
+class EnAlbu:
+    def __call__(self, results):
+        for key in results['mask_fields']:
+            results[key] = Mask([results[key]])
+        return results
+
+
+
+@PIPELINES.register_module()
+class OutAlbu:
+    def __call__(self, results):
+        for key in results['mask_fields']:
+            results[key] = results[key][0]
+        return results
 
 
 @PIPELINES.register_module()

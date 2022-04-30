@@ -101,7 +101,6 @@ def train_model(model,
             cfg.data.samples_per_gpu,
             cfg.data.workers_per_gpu,
             cfg.data.nums_frame,
-            sampler_config = cfg.data.sampler,
             # `num_gpus` will be ignored if distributed
             num_gpus=len(cfg.gpu_ids),
             dist=distributed,
