@@ -7,12 +7,11 @@ import time
 from .dataset.metric import split_object_masks, metric_frame_JF as metric_JF
 import mmcv
 import torch
-import torch.distributed as dist
 from mmcv.runner import get_dist_info
 from pathlib import Path
 from PIL import Image
 
-def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_collect=False, do_evaluate = False):
+def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_collect=False, do_evaluate = False, runner = None):
     """Test model with multiple gpus.
     """
     model.eval()
@@ -23,6 +22,16 @@ def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_co
         prog_bar = mmcv.ProgressBar(len(dataset))
     time.sleep(2)  # This line can prevent deadlock problem in some cases.
 
+    if runner is not None:
+        if out_dir is not None:
+            out_dir = osp.join(out_dir, f'output_epoch_{runner.epoch}')
+        else:
+            out_dir_ = osp.join(runner.work_dir,f'output_epoch_{runner.epoch}')
+            if Path(out_dir_).exists():
+                out_dir = out_dir_
+
+    if out_dir is not None:
+        Path(out_dir).mkdir(parents=True,exist_ok=True)
     palette = Image.open(data_loader.dataset.palette).getpalette()
     for i, data in enumerate(data_loader):
         with torch.no_grad():
@@ -37,7 +46,7 @@ def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_co
             assert H == H_ and W == W_
             mask = mask[:h,:w]
 
-            if out_dir is not None:
+            if out_dir is not None and Path(out_dir).exists():
                 filename = img_metas['ori_filename']
                 out_path = Path(out_dir) / 'Annotations' / (filename[:-4] + '.png')
                 out_path.parent.mkdir(parents=True, exist_ok=True)

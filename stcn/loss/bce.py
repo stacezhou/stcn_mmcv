@@ -11,7 +11,7 @@ class BootstrappedCE(nn.Module):
         self.start_warm = start_warm
         self.end_warm = end_warm
         self.top_p = top_p
-        self.this_p = 0
+        self.this_p = 1
 
     def forward(self, input, target, it = 0):
         if it < self.start_warm:

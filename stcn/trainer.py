@@ -191,9 +191,9 @@ def train_model(model,
         # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
         if cfg.get('out_dir',None) is not None:
-            test_fn = partial(multi_gpu_test, out_dir=cfg.out_dir,do_evaluate = True)
+            test_fn = partial(multi_gpu_test, out_dir=cfg.out_dir,do_evaluate = True, runner=runner)
         else:
-            test_fn = partial(multi_gpu_test, do_evaluate = True)
+            test_fn = partial(multi_gpu_test, do_evaluate = True, runner = runner)
 
         runner.register_hook(
             eval_hook(val_dataloader,test_fn=test_fn, **eval_cfg), priority='LOW')
@@ -209,4 +209,4 @@ def train_model(model,
     elif cfg.load_from:
         runner.load_checkpoint(cfg.load_from)
     runner.run(data_loaders, cfg.workflow,
-            batch_size = cfg.data.samples_per_gpu)
+            batch_size = cfg.data.samples_per_gpu, runner=runner)

@@ -97,5 +97,10 @@ lr_config = dict(
     warmup_ratio=1.0 / 3,
     step=[10])
 runner = dict(type='EpochBasedRunner', max_epochs=20)
-find_unused_parameters = True
 fp16 = dict(loss_scale=512.)
+
+evaluation = dict(
+    start=10,
+    save_best='mIoU',
+    interval=1000,
+    by_epoch=False)

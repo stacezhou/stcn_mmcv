@@ -18,8 +18,4 @@ workflow = [('train', 1)]
 opencv_num_threads = 0
 # set multi-process start method as `fork` to speed up the training
 mp_start_method = 'fork'
-evaluation = dict(
-    start=10,
-    save_best='mIoU',
-    interval=1000,
-    by_epoch=False)
+find_unused_parameters = True

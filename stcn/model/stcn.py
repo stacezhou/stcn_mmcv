@@ -116,10 +116,11 @@ class STCN(BaseModule):
                     logits = torch.cat([bg_logits, logits], dim=0)
 
                 #! compute loss
-                loss += self.loss_fn(logits.swapaxes(0,1), cls_gt)
+                loss += self.loss_fn(logits.swapaxes(0,1), cls_gt, it=kw['runner'].iter)
             output = {
                 'loss': loss,
                 'nums_frame': len(oi_groups),
+                'bce_p' : self.loss_fn.this_p,
                 }
         else:
             out_masks = []
@@ -140,7 +141,7 @@ class STCN(BaseModule):
 
         return output
 
-    def train_step(self, data_series, optimizer, batch_size = None,**kw):
+    def train_step(self, data_series, optimizer, batch_size = None,*k,**kw):
         output = defaultdict(list)
         B = batch_size
         img_TB = data_series['img']
@@ -163,6 +164,7 @@ class STCN(BaseModule):
                     gt_mask = gt_mask_B,
                     img_metas=img_metas_B,
                     return_loss=True,
+                    *k,**kw
                     )
 
         loss = sum([item['loss'] for key,item in output.items()])
@@ -171,6 +173,7 @@ class STCN(BaseModule):
             'loss' : loss,
             'num_samples': nums_frame,
             'log_vars' : {
+                'bce_p' : output[0]['bce_p'],
                 'loss' : loss.detach().cpu(),
                 # 'mem_num_objs' : self.memory.gate.shape[0],
             }
