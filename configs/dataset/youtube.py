@@ -86,6 +86,7 @@ youtube_train = dict(
         max_skip = 5,
         min_skip = 1,
         max_objs_per_gpu=10,
+        max_per_frame = 3,
         image_root = '/data/YouTube/train_480p/JPEGImages',
         mask_root = '/data/YouTube/train_480p/Annotations',
 )

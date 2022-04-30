@@ -7,6 +7,7 @@ model = dict(
     type = 'STCN',
     init_cfg = dict(type='Kaiming', layer='Conv2d'),
     seg_background = False,
+    max_per_frame = 3,
     key_encoder = dict(
         type = 'KeyEncoder',
         backbone = dict(
@@ -36,7 +37,7 @@ model = dict(
             depth=18,
             in_channels=4,
             out_indices=(2,),
-            frozen_stages=1,
+            # frozen_stages=-1,
             # init_cfg=dict(type='Pretrained', 
                 # checkpoint='torchvision://resnet18')
         ),
