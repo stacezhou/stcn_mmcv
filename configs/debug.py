@@ -27,7 +27,7 @@ fp16 = dict(loss_scale=512.)
 evaluation = dict(
     start=100,
     save_best='mIoU',
-    interval=500,
+    interval=200,
     by_epoch=False)
 
 del youtube_debug_valid,youtube_train,youtube_valid
