@@ -34,6 +34,7 @@ class DistributedGroupSampler(Sampler):
                  random_skip = False,
                  max_objs_per_gpu=-1,
                  max_skip = 10,
+                 max_per_frame = 3,
                  min_skip = 1,
                  seed=0):
         _rank, _num_replicas = get_dist_info()
@@ -50,7 +51,7 @@ class DistributedGroupSampler(Sampler):
         self.shuffle_videos = shuffle_videos
         self.random_skip = random_skip
         self.min_skip = min_skip
-        self.nums_objs = self.dataset.nums_objs
+        self.nums_objs = [min(x, max_per_frame) for x in self.dataset.nums_objs]
         self.M = self.dataset.max_nums_frame
         self.max_skip = max_skip
 
@@ -84,7 +85,7 @@ class DistributedGroupSampler(Sampler):
         target = self.max_objs_per_gpu
         I_groups = []
 
-        print(ns)
+        print({n:len(vi) for n,vi in n_vi_dict.items()})
         while True:
             ns = [n for n in ns if len(n_vi_dict[n])]
             n_group = compact_to(target, ns, self.samples_per_gpu)
@@ -100,8 +101,6 @@ class DistributedGroupSampler(Sampler):
                 except:
                     break
                 I_groups.append(i_group)
-
-        print(n_vi_dict)
 
         if self.shuffle_videos:
             random.shuffle(I_groups)

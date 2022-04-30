@@ -5,6 +5,7 @@ from mmdet.models import BACKBONES, LOSSES
 from torch.nn import Parameter
 import numpy as np
 import torch
+import random
 
 VOSMODEL = Registry('vos_model')
 
@@ -36,6 +37,7 @@ class STCN(BaseModule):
                 memory,
                 loss_fn,
                 seg_background = False,
+                max_per_frame = 3,
                 init_cfg=None):
         super().__init__(init_cfg)
         self.key_encoder = VOSMODEL.build(key_encoder)
@@ -46,6 +48,7 @@ class STCN(BaseModule):
         self.use_bg = seg_background
         self.sentry = Parameter(torch.Tensor(0))
         self.targets = []
+        self.max_per_frame = max_per_frame
     
 
     def update_targets(self, new_objs, batch_size):
@@ -139,19 +142,26 @@ class STCN(BaseModule):
 
     def train_step(self, data_series, optimizer, batch_size = None,**kw):
         output = defaultdict(list)
-        step = batch_size
+        B = batch_size
+        img_TB = data_series['img']
+        BT,C,H,W = img_TB.shape
+        T = BT // B
+        img_TB = img_TB.view((T,B,C,H,W))
+        gt_mask_TB = data_series['gt_mask'].view((T,B,1,H,W))
+        img_metas_TB =[data_series['img_metas'][t*B:(t+1)*B] for t in range(T)]
+        gt_mask_TB = self.random_filter(gt_mask_TB)
         # todo 当 labels 个数超过上限后， 随机抑制 labels
-        for i in range(0,len(data_series['img']),step):
-            img = data_series['img'][i:i+step]
-            gt_mask = data_series['gt_mask'][i:i+step]
-            img_metas = data_series['img_metas'][i:i+step]
+        for i in range(T):
+            img_B = img_TB[i]
+            gt_mask_B = gt_mask_TB[i]
+            img_metas_B = img_metas_TB[i]
             flag = 'new_video' if i == 0 else ''
-            img_metas[0]['flag'] = flag
+            img_metas_B[0]['flag'] = flag
 
             output[i] = self.forward(
-                    img = img,
-                    gt_mask = gt_mask,
-                    img_metas=img_metas,
+                    img = img_B,
+                    gt_mask = gt_mask_B,
+                    img_metas=img_metas_B,
                     return_loss=True,
                     )
 
@@ -210,3 +220,13 @@ class STCN(BaseModule):
 
     def eval(self):
         self.train(False)
+    
+    def random_filter(self,gt_mask_TB):
+        for i in range(gt_mask_TB.shape[1]):
+            object_labels  = gt_mask_TB[:,i].unique().tolist()
+            object_labels.remove(0)
+            while len(object_labels) > self.max_per_frame:
+                random.shuffle(object_labels)
+                l = object_labels.pop()
+                gt_mask_TB[:,i] = torch.where(gt_mask_TB[:,i] == l,torch.zeros_like(gt_mask_TB[:,i]),gt_mask_TB[:,i])
+        return gt_mask_TB
