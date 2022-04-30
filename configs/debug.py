@@ -24,9 +24,9 @@ runner = dict(type='EpochBasedRunner', max_epochs=20)
 fp16 = dict(loss_scale=512.)
 
 evaluation = dict(
-    start=10,
+    start=100,
     save_best='mIoU',
-    interval=1000,
+    interval=500,
     by_epoch=False)
 
 del youtube_debug_valid,youtube_train,youtube_valid
