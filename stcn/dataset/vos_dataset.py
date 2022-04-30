@@ -63,6 +63,16 @@ class VOSStaticDataset(Dataset):
         batch_index = batch_index[0:1] * len(batch_index)
         return [i for ids in batch_index for i in ids]
 
+    def evaluate(self, results, logger, **kwargs):
+        J = [x['J'].mean() for x in results if x is not None]
+        F = [x['F'].mean() for x in results if x is not None]
+        import numpy as np
+        J = np.array(J).mean()
+        F = np.array(F).mean()
+        return {
+            'mIoU':J,
+            'F':F
+        }
 @DATASETS.register_module()
 class VOSDataset(Dataset):
     def __init__(self, 
