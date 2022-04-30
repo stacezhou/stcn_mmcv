@@ -15,7 +15,8 @@ def softmax_w_top(x, topk):
 
 @VOSMODEL.register_module()
 class AffinityMemoryBank():
-    def __init__(self, thin_reading_scale = 8,
+    def __init__(self, 
+            thin_reading_scale = 8,
             top_k = 20,
             mem_every = 5,
             include_last = False,

@@ -52,10 +52,10 @@ model = dict(
     ),
     memory = dict(
             type= 'AffinityMemoryBank',
-            # top_k = 3000,
-            top_k = 2000,
+            top_k = -1,
             mem_every = 5,
             include_last = False,
+            thin_reading_scale = 8,
     ),
     loss_fn = dict(type = 'BootstrappedCE'),
 )

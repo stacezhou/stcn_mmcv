@@ -12,7 +12,7 @@ from mmcv.runner import get_dist_info
 from pathlib import Path
 from PIL import Image
 
-def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None, do_evaluate = False):
+def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_collect=False, do_evaluate = False):
     """Test model with multiple gpus.
     """
     model.eval()
@@ -81,6 +81,9 @@ def collect_results_cpu(result_part, size, tmpdir=None):
         part_list = []
         for i in range(world_size):
             part_file = osp.join(tmpdir, f'part_{i}.pkl')
+            while not Path(part_file).exists():
+                print('waitting')
+                time.sleep(1)
             part_list.append(mmcv.load(part_file))
         # sort the results
         ordered_results = []

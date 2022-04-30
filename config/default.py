@@ -56,14 +56,12 @@ data = dict(
     sampler = dict(
         shuffle_videos = True,
         random_skip = True,
-        max_skip = 10,
+        max_skip = 5,
         min_skip = 1,
         max_objs_per_gpu=-1,
     ),
     train = dict(
         type='VOSDataset',
-        max_skip=10,
-        min_skip=1,
         pipeline = train_vos_pipeline,
         frame_limit = 20,
         image_root = '/data/YouTube/train_480p/JPEGImages',
@@ -97,7 +95,7 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    step=[190])
-runner = dict(type='EpochBasedRunner', max_epochs=30)
+    step=[10])
+runner = dict(type='EpochBasedRunner', max_epochs=20)
 find_unused_parameters = True
 fp16 = dict(loss_scale=512.)
