@@ -6,13 +6,6 @@ data = dict(
     workers_per_gpu = 0,
     samples_per_gpu = 2,
     nums_frame = 4,
-    sampler = dict(
-        shuffle_videos = True,
-        random_skip = True,
-        max_skip = 5,
-        min_skip = 1,
-        max_objs_per_gpu=-1,
-    ),
     train = youtube_train,
     val = youtube_debug_valid,
     test = youtube_valid,
