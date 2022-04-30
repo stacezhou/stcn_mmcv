@@ -1,0 +1,1 @@
+bash ./dist_train.py config/default.py ${GPU_NUM:1} 
