@@ -5,7 +5,6 @@ from configs._base.default_runtime import *
 data = dict(
     workers_per_gpu = 0,
     samples_per_gpu = 2,
-    max_objs_per_gpu = -1,
     nums_frame = 4,
     sampler = dict(
         shuffle_videos = True,

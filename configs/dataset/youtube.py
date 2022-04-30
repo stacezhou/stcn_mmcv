@@ -48,9 +48,14 @@ vos_test_pipeline_wo_mask = [
 ]
 
 youtube_train = dict(
-        type='VOSDataset',
+        type='VOSStaticDataset',
         pipeline = vos_train_pipeline,
         frame_limit = 20,
+        shuffle_videos = True,
+        random_skip = True,
+        max_skip = 5,
+        min_skip = 1,
+        max_objs_per_gpu=10,
         image_root = '/data/YouTube/train_480p/JPEGImages',
         mask_root = '/data/YouTube/train_480p/Annotations',
 )
