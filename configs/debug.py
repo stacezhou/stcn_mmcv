@@ -5,7 +5,7 @@ from configs._base.default_runtime import *
 data = dict(
     workers_per_gpu = 0,
     samples_per_gpu = 2,
-    nums_frame = 4,
+    nums_frame = 6,
     train = youtube_train,
     val = youtube_debug_valid,
     test = youtube_valid,
