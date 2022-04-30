@@ -5,7 +5,7 @@ from mmdet.models import LOSSES
 
 @LOSSES.register_module()
 class BootstrappedCE(nn.Module):
-    def __init__(self, start_warm=20000, end_warm=70000, top_p=0.15):
+    def __init__(self, start_warm=10000, end_warm=40000, top_p=0.15):
         super().__init__()
 
         self.start_warm = start_warm

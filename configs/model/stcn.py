@@ -13,7 +13,7 @@ model = dict(
             type='ResNet',
             depth=50,
             out_indices=(0, 1, 2),
-            frozen_stages=1,
+            frozen_stages=3,
             init_cfg=dict(type='Pretrained', 
                 checkpoint='torchvision://resnet50')
         ),
