@@ -111,7 +111,6 @@ class STCN(BaseModule):
 
                 cls_gt = self.compute_label(old_gt_mask[oii])
 
-                iou = db_eval_iou(old_gt_mask[-1,0].detach().cpu().numpy(), pred_mask[-1,0].detach().cpu().numpy())
                 logits = pred_logits[oii]
                 if not self.use_bg:
                     bg_logits = compute_bg_logits(logits)
@@ -123,7 +122,6 @@ class STCN(BaseModule):
                 'loss': loss,
                 'nums_frame': len(oi_groups),
                 'bce_p' : self.loss_fn.this_p,
-                'iou' : iou
                 }
         else:
             out_masks = []
@@ -178,7 +176,6 @@ class STCN(BaseModule):
             'log_vars' : {
                 'bce_p' : output[0]['bce_p'],
                 'loss' : loss.detach().cpu(),
-                'iou' : output[0]['iou']
                 # 'mem_num_objs' : self.memory.gate.shape[0],
             }
         }
