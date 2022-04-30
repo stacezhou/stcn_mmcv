@@ -47,12 +47,21 @@ class STCN(BaseModule):
         self.sentry = Parameter(torch.Tensor(0))
         self.targets = []
     
-    def train(self, mode=True):
-        self.memory.train(False)
-        super().train(mode)
 
-    def eval(self):
-        self.train(False)
+    def update_targets(self, new_objs, batch_size):
+        self.targets.extend(new_objs)
+        
+        # [0,0,1,1,2,2,3,3,1] -> 9 objs , 4 image
+        fi_list=[i for i,l in self.targets]
+
+        # [[0,1],[2,3,8],[4,5],[6,7]] -> 9 objs, 4 image
+        oi_groups = [[] for _ in range(batch_size)]
+        for oi,fi in enumerate(fi_list):
+            oi_groups[fi].append(oi)
+    
+        self.memory.update_targets(fi_list)
+        self.fi_list = fi_list
+        self.oi_groups = oi_groups
 
     def forward(self,img=None, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
         if img is None:
@@ -64,7 +73,10 @@ class STCN(BaseModule):
 
         if img_metas[0]['flag'] == 'new_video':
             self.memory.reset()
-            self.targets = []
+            # List of (frame_index, object_label)
+            self.targets = [] 
+            # List of (object_index,...) of a frame
+            # [[0,1],[2,3,8],[4,5],[6,7]] -> 9 objs, 4 image
             self.oi_groups = []
         
         if self.memory.is_init:
@@ -72,6 +84,9 @@ class STCN(BaseModule):
             V = self.memory.read(K)
             #! deocde mask
             pred_logits, pred_mask = self.mask_decoder(V, feats, self.fi_list)
+
+            # fi_list : [0,0,1,1,2,2,3,3,1] -> 9 objs , 4 image
+
 
         if gt_mask is not None:
             oi_groups = self.oi_groups.copy()
@@ -85,7 +100,7 @@ class STCN(BaseModule):
             self.memory.write(K, V)
 
         if return_loss:
-            loss = torch.sum(self.sentry * 0)
+            loss = torch.sum(self.sentry * 0) 
             for oii in oi_groups:
                 if len(oii) == 0:
                     continue
@@ -113,6 +128,7 @@ class STCN(BaseModule):
                 out_mask = self.compute_label(mask[oii])
                 out_mask = out_mask.cpu().numpy().astype(np.uint8).squeeze(0)
                 out_masks.append(out_mask)
+
             if len(out_masks) == 0:
                 out_mask = np.zeros((img_metas[0]['img_shape'][:2])).astype(np.uint8)
                 out_masks.append(out_mask)
@@ -131,6 +147,7 @@ class STCN(BaseModule):
             img_metas = data_series['img_metas'][i:i+step]
             flag = 'new_video' if i == 0 else ''
             img_metas[0]['flag'] = flag
+
             output[i] = self.forward(
                     img = img,
                     gt_mask = gt_mask,
@@ -149,20 +166,6 @@ class STCN(BaseModule):
             }
         }
 
-    def update_targets(self, new_objs, batch_size):
-        self.targets.extend(new_objs)
-        
-        # [0,0,1,1,2,2,3,3,1] -> 9 objs , 4 image
-        fi_list=[i for i,l in self.targets]
-
-        # [[0,1],[2,3,8],[4,5],[6,7]] -> 9 objs, 4 image
-        oi_groups = [[] for _ in range(batch_size)]
-        for oi,fi in enumerate(fi_list):
-            oi_groups[fi].append(oi)
-    
-        self.memory.update_targets(fi_list)
-        self.fi_list = fi_list
-        self.oi_groups = oi_groups
 
 
     def parse_targets(self, gt_mask):
@@ -199,3 +202,11 @@ class STCN(BaseModule):
             p_mask = torch.cat([bg_mask, p_mask], dim=0)
         out_mask_label = torch.argmax(p_mask, dim=0)
         return out_mask_label
+
+
+    def train(self, mode=True):
+        self.memory.train(False)
+        super().train(mode)
+
+    def eval(self):
+        self.train(False)

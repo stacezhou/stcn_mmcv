@@ -73,7 +73,7 @@ class AffinityMemoryBank():
         obj_affinity = frame_affinity[self.ii] * gate # N,THW,HW
         if self.test_mode and 0 < self.top_k < obj_affinity.shape[1]:
             pass
-            # todo
+            # todo softmax_w_top
             # values, indices = torch.topk(obj_affinity, self.top_k, dim=1)
             # x = torch.zeros_like(obj_affinity)
             # obj_affinity = x.scatter_(1, indices, obj_affinity)
@@ -86,7 +86,6 @@ class AffinityMemoryBank():
         return V
     
     def read(self, K):
-        # return self.Vs[:,:,0]
         B,C,H,W = K.shape
         step = (W+self.thin_reading_scale) // self.thin_reading_scale
         V_ = []

@@ -25,7 +25,7 @@ train_vos_pipeline= [
 test_vos_pipeline= [
     dict(type='LoadImageFromFile'),
     dict(type='LoadMaskFromFile'),
-    dict(type='MergeImgMask'),
+    dict(type='MergeImgMask'), 
     dict(type='Pad', size_divisor=32),
     dict(type='SplitImgMask'),
     dict(type='ImageToTensor',keys=['gt_mask']),
