@@ -48,6 +48,7 @@ class STCN(BaseModule):
         self.use_bg = seg_background
         self.sentry = Parameter(torch.Tensor(0))
         self.targets = []
+        self.oi_groups = []
         self.max_per_frame = max_per_frame
     
 
@@ -135,7 +136,7 @@ class STCN(BaseModule):
                 out_masks.append(out_mask)
 
             if len(out_masks) == 0:
-                out_mask = np.zeros((img_metas[0]['img_shape'][:2])).astype(np.uint8)
+                out_mask = np.zeros((img_metas[0]['pad_shape'][:2])).astype(np.uint8)
                 out_masks.append(out_mask)
                 
             output = out_masks

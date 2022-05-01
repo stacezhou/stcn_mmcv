@@ -192,7 +192,8 @@ class VOSDataset(Dataset):
             data = self.pipeline(data)
         return data
 
-    def evaluate(self, results, logger, **kwargs):
+    def evaluate(self, results, logger=None, **kwargs):
+        results = [x for x in results if x is not None]
         J = [x['J'].mean() for x in results if x is not None]
         F = [x['F'].mean() for x in results if x is not None]
         import numpy as np

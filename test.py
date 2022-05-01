@@ -6,7 +6,8 @@ from mmdet.datasets import build_dataset
 from mmcv.runner import load_checkpoint, wrap_fp16_model
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from stcn.testor import multi_gpu_test
-
+from pathlib import Path
+import mmcv
 def main():
     cfg, meta, timestamp, distributed = get_config()
     model = VOSMODEL.build(cfg.model)
@@ -24,13 +25,20 @@ def main():
 
     if not distributed:
         model = MMDataParallel(model, device_ids=cfg.gpu_ids)
-        multi_gpu_test(model, data_loader, out_dir=cfg.out_dir)
     else:
         model = MMDistributedDataParallel(
             model.cuda(),
             device_ids=[torch.cuda.current_device()],
             broadcast_buffers=False)
-        multi_gpu_test(model, data_loader, out_dir=cfg.out_dir)
+    if hasattr(cfg, 'out_dir'):
+        out_dir = cfg.out_dir
+    else:
+        out_dir = None
+    results = multi_gpu_test(model, data_loader, out_dir=out_dir)
+    
+    eval_res = dataset.evaluate(results)
+    mmcv.dump(results,Path(cfg.work_dir) / 'test_results_details.pkl')
+    print(eval_res)
 
 
 if __name__ == '__main__':

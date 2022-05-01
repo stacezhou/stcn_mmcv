@@ -54,7 +54,7 @@ def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_co
                 im.putpalette(palette)
                 im.save(out_path)
 
-            if do_evaluate is not None:
+            if do_evaluate is not None and 'gt_mask' in data:
                 'compute score'
                 gt_mask = data['gt_mask'].data[0][0].squeeze(0)[:h,:w]
                 labels = img_metas['labels'][1:]
