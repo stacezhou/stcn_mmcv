@@ -110,6 +110,8 @@ class VOSDataset(Dataset):
         # 
         all_nums_frames = [v['nums_frame'] for k,v in self.data_infos.items()]
         video_M = max(all_nums_frames) 
+        if self.test_mode:
+            frame_limit = 999
         self.M = min(video_M, frame_limit) 
 
         self.nums_objs = [self.data_infos[v]['nums_obj'] for v in self.videos]
