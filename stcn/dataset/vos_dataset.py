@@ -79,7 +79,7 @@ class VOSDataset(Dataset):
             image_root, 
             mask_root, 
             pipeline=[], 
-            frame_limit = 20, 
+            frame_limit = -1, 
             palette = None,
             wo_mask_pipeline = [], 
             test_mode=False,
@@ -110,9 +110,10 @@ class VOSDataset(Dataset):
         # 
         all_nums_frames = [v['nums_frame'] for k,v in self.data_infos.items()]
         video_M = max(all_nums_frames) 
-        if test_mode:
-            frame_limit = 999
-        self.M = min(video_M, frame_limit) 
+        if frame_limit < 0:
+            self.M = video_M
+        else:
+            self.M = min(video_M, frame_limit) 
 
         self.nums_objs = [self.data_infos[v]['nums_obj'] for v in self.videos]
 
@@ -201,6 +202,7 @@ class VOSDataset(Dataset):
         import numpy as np
         J = np.array(J).mean()
         F = np.array(F).mean()
+
         return {
             'mIoU':J,
             'F':F
