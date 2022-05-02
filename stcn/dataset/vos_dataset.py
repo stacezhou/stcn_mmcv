@@ -1,4 +1,4 @@
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset,ConcatDataset as _ConcatDataset
 from pathlib import Path
 from mmdet.datasets.pipelines import Compose
 from mmdet.datasets import DATASETS
@@ -276,6 +276,40 @@ class VOSDataset(Dataset):
         indices = [x for group in indices_group for x in group]
         return indices
 
+DATASETS._module_dict.pop('ConcatDataset')
+@DATASETS.register_module()
+class ConcatDataset(_ConcatDataset):
+    def __init__(self, datasets) -> None:
+        super().__init__(datasets)
+
+    @property
+    def test_mode(self):
+        for ds in self.datasets:
+            assert not ds.test_mode, 'concat dataset only support train mode'
+        return False
+
+    def flat_fn(self, batch_index):
+        return [i for ids in batch_index for i in ids]
+    def get_indices(self, samples_per_gpu):
+        indices = []
+        for ds,cum in zip(self.datasets, self.cumulative_sizes):
+            indice = ds.get_indices(samples_per_gpu)
+            cum_indice = [[cum + idx for idx in idx_group] for idx_group in indice]
+            indices.extend(cum_indice)
+        return indices
+    
+    def evaluate(self, results, logger=None, **kwargs):
+        results = [x for x in results if x is not None]
+        J = [x['J'].mean() for x in results if x is not None]
+        F = [x['F'].mean() for x in results if x is not None]
+        import numpy as np
+        J = np.array(J).mean()
+        F = np.array(F).mean()
+
+        return {
+            'mIoU':J,
+            'F':F
+        }
 
 def compact_to(target, options, nums, top=True):
     'target: 10, options: 5,4,3,2, nums: 3 --> [5,3,2]'

@@ -1,4 +1,4 @@
-from configs.path import youtube
+from configs.path import davis
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 meta_keys = ('flag', 'filename', 'ori_filename','labels',
@@ -77,7 +77,7 @@ vos_test_pipeline_wo_mask = [
 
 ]
 
-youtube_train = dict(
+davis_train = dict(
         type='VOSDataset',
         pipeline = vos_train_pipeline,
         frame_limit = 30,
@@ -87,25 +87,6 @@ youtube_train = dict(
         min_skip = 1,
         max_objs_per_gpu= 9,
         max_per_frame = 4,
-        image_root = youtube['train']['image_root'],
-        mask_root = youtube['train']['mask_root'],
-)
-youtube_valid = dict(
-        type='VOSDataset',
-        test_mode = True,
-        pipeline = vos_test_pipeline,
-        wo_mask_pipeline =vos_test_pipeline_wo_mask,
-        image_root = youtube['val']['image_root'],
-        mask_root = youtube['val']['mask_root'],
-        palette = youtube['val']['palette'],
-)
-
-youtube_debug_valid = dict(
-        type='VOSDataset',
-        test_mode = True,
-        pipeline = vos_test_pipeline,
-        wo_mask_pipeline = vos_test_pipeline_wo_mask,
-        image_root = youtube['mini_val']['image_root'],
-        mask_root = youtube['mini_val']['mask_root'],
-        palette = youtube['mini_val']['palette'],
+        image_root = davis['image_root'],
+        mask_root = davis['mask_root'],
 )
