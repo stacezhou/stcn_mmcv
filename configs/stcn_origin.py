@@ -29,9 +29,9 @@ data['train'].update(dict(
     max_objs_per_gpu= 8,
     frame_limit = 30,
     shuffle_videos = True,
-    random_skip = False,
+    random_skip = True,
     max_skip = 5,
-    min_skip = 1,
+    min_skip = 3,
 ))
 
 optimizer = dict(type='Adam', lr=0.0005)
