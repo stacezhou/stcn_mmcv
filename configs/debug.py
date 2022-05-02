@@ -16,10 +16,7 @@ data = dict(
     workers_per_gpu = 0,
     samples_per_gpu = 2,
     nums_frame = 2,
-    train = [
-            youtube_train,
-            youtube_train,
-            ],
+    train = youtube_train,
     val = youtube_debug_valid,
     test = youtube_valid,
 )
