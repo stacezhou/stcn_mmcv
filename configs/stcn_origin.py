@@ -25,7 +25,7 @@ data['train'].update(dict(
 ))
 
 optimizer = dict(type='Adam', lr=0.0005)
-optimizer_config = dict(grad_clip=None)
+optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # learning policy
 lr_config = dict(
     policy='step',
