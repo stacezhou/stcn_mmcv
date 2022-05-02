@@ -9,7 +9,7 @@ train_data_config = dict(
     max_objs_per_gpu= 10,
     frame_limit = 36,
     shuffle_videos = True,
-    random_skip = True,
+    random_skip = False,
     max_skip = 5,
     min_skip = 1,
 )
@@ -21,7 +21,7 @@ data = dict(
     workers_per_gpu = 0,
     samples_per_gpu = 4,
     nums_frame = 4,
-    train = [youtube_train, davis_train],
+    train = youtube_train,
     val = youtube_debug_valid,
     test = youtube_valid,
 )
@@ -29,7 +29,7 @@ data = dict(
 model.update(dict(
     max_per_frame = 3
 ))
-model['key_encoder']['backbone']['frozen_stages'] = 3
+model['key_encoder']['backbone']['frozen_stages'] = 2
 optimizer = dict(type='Adam', lr=0.0005)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # learning policy
