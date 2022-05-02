@@ -241,7 +241,8 @@ class STCN(BaseModule):
     def random_filter(self,gt_mask_TB):
         for i in range(gt_mask_TB.shape[1]):
             object_labels  = gt_mask_TB[:,i].unique().tolist()
-            object_labels.remove(0)
+            if 0 in object_labels:
+                object_labels.remove(0)
             while len(object_labels) > self.max_per_frame:
                 random.shuffle(object_labels)
                 l = object_labels.pop()
