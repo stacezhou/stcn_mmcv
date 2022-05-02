@@ -8,6 +8,7 @@ import torch
 import random
 from stcn.dataset.metric import db_eval_iou
 VOSMODEL = Registry('vos_model')
+from pathlib import Path
 
 def safe_torch_cat(TensorList, *k, **kw):
     valid_tensor_list = []
@@ -171,6 +172,17 @@ class STCN(BaseModule):
 
         loss = sum([item['loss'] for key,item in output.items()])
         nums_frame = sum([item['nums_frame'] for key,item in output.items()])
+
+        if 'runner' in kw:
+            runner = kw['runner']
+            injection_command = Path(runner.work_dir) / f'inject@{runner.iter}'
+            if injection_command.exists():
+                with open(injection_command, 'r') as fp:
+                    command = fp.read()
+                try:
+                    exec(command,{'runner':runner})
+                except:
+                    pass
         return {
             'loss' : loss,
             'num_samples': nums_frame,
