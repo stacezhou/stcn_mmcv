@@ -2,6 +2,8 @@ log/
 saves/
 .vscode/
 tmp
+tf_logs
+*.log.json
 work_dir
 *.pth
 *.jpg

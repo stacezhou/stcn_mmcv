@@ -16,7 +16,7 @@ model.update(dict(
 ))
 data['train'].update(dict(
     max_per_frame = 2,
-    max_objs_per_gpu= 4,
+    max_objs_per_gpu= 8,
     frame_limit = 30,
     shuffle_videos = True,
     random_skip = False,
