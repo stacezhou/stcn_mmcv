@@ -28,7 +28,8 @@ class DistributedGroupSampler(Sampler):
         self.epoch = 0
         self.seed = seed if seed is not None else 0
         self.indices = self.dataset.get_indices(self.samples_per_gpu)
-        self.num_samples = len(self.indices) // self.num_replicas
+        M = self.dataset.M
+        self.num_samples = (len(self.indices) // M + self.num_replicas) // self.num_replicas * M
 
     def __iter__(self):
         # deterministically shuffle based on epoch
