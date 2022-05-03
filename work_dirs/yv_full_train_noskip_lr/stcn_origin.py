@@ -39,7 +39,7 @@ log_config = dict(
            dict(type='TensorboardLoggerHook')])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-load_from = 'work_dirs/yv_full_train_noskip_lr/best_mIoU_iter_200.pth'
+load_from = None
 resume_from = None
 workflow = [('train', 1)]
 opencv_num_threads = 0
@@ -226,7 +226,7 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=15000)
 fp16 = dict(loss_scale=512.0)
 evaluation = dict(start=100, save_best='mIoU', interval=100, by_epoch=False)
-work_dir = './work_dirs/stcn_origin'
+work_dir = 'work_dirs/yv_full_train_noskip_lr'
 validate = True
 auto_resume = False
-gpu_ids = range(0, 2)
+gpu_ids = range(0, 3)
