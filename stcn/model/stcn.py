@@ -7,6 +7,8 @@ import numpy as np
 import torch
 import random
 from stcn.dataset.metric import db_eval_iou
+import torch.nn.functional as F
+
 VOSMODEL = Registry('vos_model')
 from pathlib import Path
 
@@ -39,18 +41,28 @@ class STCN(BaseModule):
                 loss_fn,
                 seg_background = False,
                 max_per_frame = 3,
+                multi_scale = False,
+                scales = [1, 1.3, 1.5, 2],
+                align_corners = True,
                 init_cfg=None):
         super().__init__(init_cfg)
         self.key_encoder = VOSMODEL.build(key_encoder)
         self.value_encoder = VOSMODEL.build(value_encoder)
         self.mask_decoder = VOSMODEL.build(mask_decoder)
-        self.memory = VOSMODEL.build(memory)
         self.loss_fn = LOSSES.build(loss_fn)
         self.use_bg = seg_background
         self.sentry = Parameter(torch.Tensor(0))
         self.targets = []
         self.oi_groups = []
         self.max_per_frame = max_per_frame
+
+        self.do_multi_scale = multi_scale
+        if not self.do_multi_scale:
+            self.multi_scales = [1]
+        else:
+            self.multi_scales = scales
+        self.memory = [VOSMODEL.build(memory) for s in self.multi_scales]
+        self.align_corners = align_corners
     
 
     def update_targets(self, new_objs, batch_size):
@@ -64,62 +76,117 @@ class STCN(BaseModule):
         for oi,fi in enumerate(fi_list):
             oi_groups[fi].append(oi)
     
-        self.memory.update_targets(fi_list)
+        for memory in self.memory:
+            memory.update_targets(fi_list)
         self.fi_list = fi_list
         self.oi_groups = oi_groups
 
     def forward(self,img=None, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
         if img is None:
             return [None]
-        pred_mask = None
-        new_gt_mask = None
+
+        pred_mask = [None for s in self.multi_scales]
+        old_gt_mask = [None for s in self.multi_scales]
+        new_gt_mask = [None for s in self.multi_scales]
+        pred_logits = [None for s in self.multi_scales]
+        mask = [None for s in self.multi_scales]
+        V = [None for s in self.multi_scales]
+        K = [None for s in self.multi_scales]
+        feats = [None for s in self.multi_scales]
+        new_size = [None for s in self.multi_scales]
+
         #! encode key
-        K, feats = self.key_encoder(img) 
+        for i,s in enumerate(self.multi_scales):
+            *_,H,W = img.shape
+            new_size[i] = int(H*s) // 16 * 16, int(W*s) // 16 * 16
+            _img = F.interpolate(img, size=new_size[i], mode='bilinear', align_corners=self.align_corners) if s != 1 else img
+            K[i], feats[i] = self.key_encoder(_img) #!
+                
 
         if img_metas[0]['flag'] == 'new_video':
-            self.memory.reset()
+            for memory in self.memory:
+                memory.reset()
             # List of (frame_index, object_label)
             self.targets = [] 
             # List of (object_index,...) of a frame
             # [[0,1],[2,3,8],[4,5],[6,7]] -> 9 objs, 4 image
             self.oi_groups = []
         
-        if self.memory.is_init:
-            #! read memory
-            V = self.memory.read(K)
-            #! deocde mask
-            pred_logits, pred_mask = self.mask_decoder(V, feats, self.fi_list)
+        #! read memory and decode mask
+        if self.memory[0].is_init:
+            for i,s in enumerate(self.multi_scales):
+                V[i] = self.memory[i].read(K[i]) #!
+                pred_logits[i], pred_mask[i] = self.mask_decoder(V[i], feats[i], self.fi_list) #!
+                # fi_list : [0,0,1,1,2,2,3,3,1] -> 9 objs , 4 image
 
-            # fi_list : [0,0,1,1,2,2,3,3,1] -> 9 objs , 4 image
 
-
+        #! parse new & gt object mask
         if gt_mask is not None:
             oi_groups = self.oi_groups.copy()
-            old_gt_mask, new_gt_mask = self.parse_targets(gt_mask)
+            _old_gt_mask, _new_gt_mask = self.parse_targets(gt_mask)
+            for i,s in enumerate(self.multi_scales):
+                old_gt_mask[i] = F.interpolate(
+                    _old_gt_mask,
+                    size=new_size[i],
+                    mode='nearest'
+                ) if s != 1 and _old_gt_mask is not None else _old_gt_mask
+                new_gt_mask[i] = F.interpolate(
+                    _new_gt_mask,
+                    size=new_size[i],
+                    mode='nearest'
+                ) if s != 1 and _new_gt_mask is not None else _new_gt_mask
 
-        mask = safe_torch_cat([pred_mask, new_gt_mask],dim=0)
-        if mask is not None:
-            #! encode mask
-            V = self.value_encoder(mask, feats, self.fi_list)
-            #! write memory
-            self.memory.write(K, V)
+
+        #! concat predict and new_gt_mask
+        for i,s in enumerate(self.multi_scales):
+            mask[i] = safe_torch_cat([pred_mask[i],new_gt_mask[i]])
+
+        if mask[0] is not None:
+            ms_sizes = [m.shape[-2:] for m in mask]
+            fuse_mask = torch.stack([
+                    F.interpolate(
+                        m,
+                        size = ms_sizes[0],
+                        mode='nearest'
+                    ) if m.shape[-2:] != ms_sizes[0] else m
+                for m in mask
+                ]).float().mean(dim=0)
+            #! multi scale interact
+            mask = [
+                    F.interpolate(
+                        fuse_mask,
+                        size = ms_size,
+                        mode='nearest'
+                    ) if fuse_mask.shape[-2:] != ms_size else fuse_mask
+                for ms_size in ms_sizes
+                ]
+
+            #! encode object mask and write memory
+            for i,s in enumerate(self.multi_scales):
+                V[i] = self.value_encoder(mask[i], feats[i],self.fi_list)
+                self.memory[i].write(K[i],V[i])
+
+
 
         if return_loss:
-            loss = torch.sum(self.sentry * 0) 
-            iou = 0
-            for oii in oi_groups:
-                if len(oii) == 0:
-                    continue
+            loss = []
+            for _old_gt_mask, _pred_logits in zip(old_gt_mask, pred_logits):
+                _loss = torch.sum(self.sentry * 0) 
+                iou = 0
+                for oii in oi_groups:
+                    if len(oii) == 0:
+                        continue
 
-                cls_gt = self.compute_label(old_gt_mask[oii])
+                    cls_gt = self.compute_label(_old_gt_mask[oii])
+                    logits = _pred_logits[oii]
+                    if not self.use_bg:
+                        bg_logits = compute_bg_logits(logits)
+                        logits = torch.cat([bg_logits, logits], dim=0)
 
-                logits = pred_logits[oii]
-                if not self.use_bg:
-                    bg_logits = compute_bg_logits(logits)
-                    logits = torch.cat([bg_logits, logits], dim=0)
-
-                #! compute loss
-                loss += self.loss_fn(logits.swapaxes(0,1), cls_gt, it=kw['runner'].iter)
+                    #! compute loss
+                    _loss += self.loss_fn(logits.swapaxes(0,1), cls_gt, it=kw['runner'].iter)
+                    loss.append(_loss)
+            loss = sum(loss)
             output = {
                 'loss': loss,
                 'nums_frame': len(oi_groups),
@@ -132,7 +199,7 @@ class STCN(BaseModule):
                     continue
 
                 #! pred mask
-                out_mask = self.compute_label(mask[oii])
+                out_mask = self.compute_label(fuse_mask[oii])
                 out_mask = out_mask.cpu().numpy().astype(np.uint8).squeeze(0)
                 out_masks.append(out_mask)
 
@@ -209,14 +276,14 @@ class STCN(BaseModule):
             old_gt_mask = torch.stack([
                 gt_mask[i] == label 
                 for i,label in self.targets
-            ])
+            ]).float()
         else:
             old_gt_mask = None
         if len(new_objs) > 0:
             new_gt_mask = torch.stack([
                 gt_mask[i] == label 
                 for i,label in new_objs
-            ])
+            ]).float()
             self.update_targets(new_objs, gt_mask.shape[0])
         else:
             new_gt_mask = None
@@ -232,7 +299,8 @@ class STCN(BaseModule):
 
 
     def train(self, mode=True):
-        self.memory.train(True)
+        for memory in self.memory:
+            memory.train(mode)
         super().train(mode)
 
     def eval(self):
