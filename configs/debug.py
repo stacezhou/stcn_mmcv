@@ -5,9 +5,9 @@ from configs._base.default_runtime import *
 youtube_train.update(dict(
     max_per_frame = 2,
     max_objs_per_gpu= 4,
-    frame_limit = 10,
     shuffle_videos = True,
     random_skip = False,
+    nums_frame = 4,
     max_skip = 5,
     min_skip = 1,
 ))
@@ -23,9 +23,6 @@ data = dict(
 
 model.update(dict(
     max_per_frame = 2
-))
-data['val'].update(dict(
-    frame_limit = 10
 ))
 
 optimizer = dict(type='Adam', lr=0.0005)

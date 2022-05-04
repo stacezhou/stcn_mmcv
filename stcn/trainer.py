@@ -100,7 +100,6 @@ def train_model(model,
             ds,
             cfg.data.samples_per_gpu,
             cfg.data.workers_per_gpu,
-            cfg.data.nums_frame,
             # `num_gpus` will be ignored if distributed
             num_gpus=len(cfg.gpu_ids),
             dist=distributed,
@@ -182,7 +181,6 @@ def train_model(model,
             val_dataset,
             samples_per_gpu=val_samples_per_gpu,
             workers_per_gpu=cfg.data.workers_per_gpu,
-            nums_frame=1,
             dist=distributed,
             shuffle=False)
         eval_cfg = cfg.get('evaluation', {})
