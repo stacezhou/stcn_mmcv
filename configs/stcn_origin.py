@@ -7,9 +7,9 @@ from configs._base.default_runtime import *
 train_data_config = dict(
     max_per_frame = 3,
     max_objs_per_gpu= 10,
-    frame_limit = 36,
     shuffle_videos = True,
     random_skip = False,
+    nums_frame = 4,
     max_skip = 5,
     min_skip = 1,
 )
@@ -20,7 +20,6 @@ ovis_train.update(train_data_config)
 data = dict(
     workers_per_gpu = 0,
     samples_per_gpu = 4,
-    nums_frame = 4,
     train = youtube_train,
     val = youtube_debug_valid,
     test = youtube_valid,
@@ -29,18 +28,13 @@ data = dict(
 model.update(dict(
     max_per_frame = 3
 ))
-model['key_encoder']['backbone']['frozen_stages'] = 2
+model['key_encoder']['backbone']['frozen_stages'] = 3
 model['loss_fn'].update(dict(
     start_warm=5000, 
     end_warm=10000, 
     top_p=0.15
 ))
-model['memory'].update(dict(
-    top_k = 10,
-    mem_every = 5,
-    include_last = True,
-    thin_reading_scale = 8,
-))
+
 optimizer = dict(type='Adam', lr=0.0005)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # learning policy

@@ -79,12 +79,12 @@ class VOSDataset(Dataset):
             image_root, 
             mask_root, 
             pipeline=[], 
-            frame_limit = -1, 
             palette = None,
             wo_mask_pipeline = [], 
             test_mode=False,
             shuffle_videos = False,
             random_skip = False,
+            nums_frame = 4,
             max_objs_per_gpu=8,
             max_skip = 10,
             max_per_frame = 3,
@@ -105,15 +105,17 @@ class VOSDataset(Dataset):
         else:
             self.data_infos = generate_meta(image_root, mask_root)
             mmcv.dump(self.data_infos, meta_stcn)
+        self.data_infos = {k:v for k,v in self.data_infos.items() 
+                            if v['nums_frame'] > min_skip * nums_frame}
         self.videos = sorted(list(self.data_infos.keys()))
 
         # 
         all_nums_frames = [v['nums_frame'] for k,v in self.data_infos.items()]
-        video_M = max(all_nums_frames) 
-        if frame_limit < 0:
-            self.M = video_M
-        else:
-            self.M = min(video_M, frame_limit) 
+        self.M = max(all_nums_frames) 
+        if not test_mode:
+            self.M = (self.M+nums_frame) // nums_frame * nums_frame
+
+        self.nums_frame = nums_frame
 
         self.nums_objs = [self.data_infos[v]['nums_obj'] for v in self.videos]
 
@@ -213,7 +215,7 @@ class VOSDataset(Dataset):
         return [i for ids in batch_index for i in ids]
     def get_indices(self, samples_per_gpu):
         if self.test_mode:
-            return [[x] for x in range(len(self))]
+            return [[[x]] for x in range(len(self))]
         n_vi_dict = defaultdict(list) # n vi : the video index is 'vi' and it has 'n' targets
         for vi,n in enumerate(self.nums_objs):
             n_vi_dict[n].append(vi)
@@ -246,35 +248,41 @@ class VOSDataset(Dataset):
         if self.shuffle_videos:
             random.shuffle(I_groups)
 
-        def clamp(f_id, v_l):
-            if f_id >= v_l: # 0,1,2,3, 2,1, 2,3, 2,1, 2,3
-                x = (f_id - v_l) // (v_l - 2)
-                f_id = (f_id - v_l) % (v_l - 2)
-                if x % 2 == 0:
-                    f_id -= 2
-                else:
-                    f_id += 2
-            return f_id
-
-        indices_group = []
+        indices = []
         for group in I_groups:
-            if self.random_skip:
-                f_id_group = []
-                for vi in group:
-                    f_ids = []
-                    f_id = 0
-                    for j in range(self.M):
-                        f_id = f_id + random.randint(self.min_skip, self.max_skip)
-                        f_ids.append(f_id)
-                    f_ids = [self.M + clamp(f,self.M) for f in f_ids]
-                    f_id_group.append(f_ids)
-            else:
-                f_id_group = [list(range(i*self.M, (i+1)*self.M)) for i in group]
+            f_id_group = []
+            for vi in group:
+                f_ids = self.random_pick_frames(vi)
+                f_id_group.append(f_ids)
             transposed = list(zip(*f_id_group))
-            indices_group.append(transposed)
+            indices.append(transposed)
         
-        indices = [x for group in indices_group for x in group]
         return indices
+    
+    def random_pick_frames(self, vi):
+        v = self.videos[vi]
+        max_fid = min(self.data_infos[v]['nums_frame'] - 1, self.M)
+
+        skips = [random.randint(self.min_skip,self.max_skip) 
+                for i in range(self.nums_frame - 1)]
+        trial_times = 0
+        while sum(skips) > max_fid and trial_times < 10:
+            skips = [random.randint(self.min_skip,self.max_skip) 
+                    for i in range(self.nums_frame - 1)]
+            trial_times += 1
+        if trial_times == 10:
+            skips = [self.min_skip for i in range(self.nums_frame - 1)]
+        start = random.randint(0, max_fid - sum(skips))
+        offsets = [0] 
+        for skip in skips:
+            offsets.append(offsets[-1] + skip)
+        fids = [x+start+self.M * vi for x in offsets]
+        assert fids[0] >= vi*self.M and fids[-1] < (vi+1)*self.M
+        return fids
+
+
+
+        
 
 DATASETS._module_dict.pop('ConcatDataset')
 @DATASETS.register_module()
