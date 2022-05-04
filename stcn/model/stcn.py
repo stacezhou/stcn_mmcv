@@ -232,7 +232,7 @@ class STCN(BaseModule):
 
 
     def train(self, mode=True):
-        self.memory.train(False)
+        self.memory.train(True)
         super().train(mode)
 
     def eval(self):
