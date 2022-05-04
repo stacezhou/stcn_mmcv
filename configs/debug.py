@@ -18,9 +18,15 @@ data = dict(
     nums_frame = 2,
     train = youtube_train,
     val = youtube_debug_valid,
-    test = youtube_valid,
+    test = youtube_debug_valid,
 )
 
+model['memory'].update(dict(
+    top_k = 10,
+    mem_every = 5,
+    include_last = True,
+    thin_reading_scale = 8,
+))
 model.update(dict(
     max_per_frame = 2
 ))
@@ -39,7 +45,7 @@ runner = dict(type='EpochBasedRunner', max_epochs=10)
 fp16 = dict(loss_scale=512.)
 
 evaluation = dict(
-    start=10,
+    start=50,
     save_best='mIoU',
     interval=100,
     by_epoch=False)

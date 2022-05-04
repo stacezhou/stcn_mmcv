@@ -2,16 +2,6 @@ from .stcn import VOSMODEL
 import torch
 import torch.nn.functional as F
 import math
-def softmax_w_top(x, topk):
-    values, indices = torch.topk(x, k=topk, dim=1)
-    x_exp = values.exp_()
-
-    x_exp /= torch.sum(x_exp, dim=1, keepdim=True)
-    # The types should be the same already
-    # some people report an error here so an additional guard is added
-    x.zero_().scatter_(1, indices, x_exp.type(x.dtype)) # B * THW * HW
-
-    return x
 
 @VOSMODEL.register_module()
 class AffinityMemoryBank():
@@ -53,36 +43,38 @@ class AffinityMemoryBank():
 
     def _read(self, K):
         B,Ck,h,w = K.shape
-        Ks = self.Ks.flatten(start_dim=2) # B,C,THW
+        N,Cv,T,H,W = self.Vs.shape
+
+        gate = self.gate.view((N,1,T,1,1))
+        Ks = self.Ks[self.ii] * gate
+        K = K[self.ii]
+
+        Ks = Ks.flatten(start_dim=2) # B,C,THW
         K = K.flatten(start_dim=2) #B,C,HW
 
         # See supplementary material
         a_sq = Ks.pow(2).sum(1).unsqueeze(2) # B,THW,1
         ab = Ks.transpose(1, 2) @ K # B,THW,HW
-        frame_affinity = (2*ab-a_sq) / math.sqrt(Ks.shape[1])   # B, THW, HW
+        affinity = (2*ab-a_sq) / math.sqrt(Ks.shape[1])   # B, THW, HW
         
         # softmax operation; aligned the evaluation style
-        maxes = torch.max(frame_affinity, dim=1, keepdim=True)[0]
-        x_exp = torch.exp(frame_affinity - maxes)
-        x_exp_sum = torch.sum(x_exp, dim=1, keepdim=True)
-        frame_affinity = x_exp / x_exp_sum  # B,THW,HW
-        # del maxes,x_exp,x_exp_sum,ab,a_sq # save memory
-
-        N,Cv,T,H,W = self.Vs.shape
-        gate = self.gate.view((N,T,1,1,1)).repeat(1,1,H,W,1).view((N,T*H*W,1))
-        obj_affinity = frame_affinity[self.ii] * gate # N,THW,HW
-        if self.test_mode and 0 < self.top_k < obj_affinity.shape[1]:
-            pass
-            # todo softmax_w_top
-            # values, indices = torch.topk(obj_affinity, self.top_k, dim=1)
-            # x = torch.zeros_like(obj_affinity)
-            # obj_affinity = x.scatter_(1, indices, obj_affinity)
+        if self.test_mode and 0 < self.top_k < affinity.shape[1]:
+            maxes = torch.max(affinity, dim=1, keepdim=True)[0]
+            values, indices = torch.topk(affinity - maxes, k=self.top_k, dim=1)
+            x_exp = values.exp_()
+            x_exp /= torch.sum(x_exp, dim=1, keepdim=True)
+            # The types should be the same already
+            # some people report an error here so an additional guard is added
+            affinity.zero_().scatter_(1, indices, x_exp.type(affinity.dtype)) # B * THW * HW
             
-
-        del frame_affinity
+        else: # softmax
+            maxes = torch.max(affinity, dim=1, keepdim=True)[0]
+            x_exp = torch.exp(affinity - maxes)
+            x_exp_sum = torch.sum(x_exp, dim=1, keepdim=True)
+            affinity = x_exp / x_exp_sum  # B,THW,HW
 
         Vs = self.Vs.flatten(start_dim=2)
-        V = torch.bmm(Vs, obj_affinity).view((N,Cv,h,w))
+        V = torch.bmm(Vs, affinity).view((N,Cv,h,w))
         return V
     
     def read(self, K):
