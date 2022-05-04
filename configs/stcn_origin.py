@@ -8,9 +8,9 @@ train_data_config = dict(
     max_per_frame = 3,
     max_objs_per_gpu= 10,
     shuffle_videos = True,
-    random_skip = False,
-    nums_frame = 4,
-    max_skip = 5,
+    random_skip = True,
+    nums_frame = 3,
+    max_skip = 2,
     min_skip = 1,
 )
 youtube_train.update(train_data_config)
@@ -20,7 +20,10 @@ ovis_train.update(train_data_config)
 data = dict(
     workers_per_gpu = 0,
     samples_per_gpu = 4,
-    train = youtube_train,
+    train = [davis_train,
+            youtube_train,
+            davis_train,
+            davis_train],
     val = youtube_debug_valid,
     test = youtube_valid,
 )
