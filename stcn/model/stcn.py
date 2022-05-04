@@ -154,7 +154,6 @@ class STCN(BaseModule):
         gt_mask_TB = data_series['gt_mask'].view((T,B,1,H,W))
         img_metas_TB =[data_series['img_metas'][t*B:(t+1)*B] for t in range(T)]
         gt_mask_TB = self.random_filter(gt_mask_TB)
-        print(img_metas_TB)
         # todo 当 labels 个数超过上限后， 随机抑制 labels
         for i in range(T):
             img_B = img_TB[i]
