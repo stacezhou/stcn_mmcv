@@ -42,6 +42,7 @@ class STCN(BaseModule):
                 seg_background = False,
                 max_per_frame = 3,
                 multi_scale = False,
+                multi_scale_train = False,
                 scales = [1, 1.3, 1.5, 2],
                 align_corners = True,
                 init_cfg=None):
@@ -61,6 +62,7 @@ class STCN(BaseModule):
             self.multi_scales = [1]
         else:
             self.multi_scales = scales
+        self.multi_scale_train = multi_scale_train
         self.memory = [VOSMODEL.build(memory) for s in self.multi_scales]
         self.align_corners = align_corners
     
@@ -301,6 +303,8 @@ class STCN(BaseModule):
     def train(self, mode=True):
         for memory in self.memory:
             memory.train(mode)
+        if mode == True and not self.multi_scale_train:
+            self.multi_scales = [1]
         super().train(mode)
 
     def eval(self):

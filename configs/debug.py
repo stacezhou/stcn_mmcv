@@ -30,7 +30,8 @@ model['memory'].update(dict(
 model.update(dict(
     max_per_frame = 2,
     multi_scale = True,
-    scales = [1, 1.5],
+    multi_scale_train = True,
+    scales = [1, 0.4],
 ))
 
 optimizer = dict(type='Adam', lr=0.0005)

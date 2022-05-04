@@ -21,7 +21,8 @@ data = dict(
 )
 
 model.update(dict(
-    max_per_frame = 2
+    max_per_frame = 2,
+    multi_scale_train = False,
 ))
 
 model['memory'].update(dict(
