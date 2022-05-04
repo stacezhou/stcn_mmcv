@@ -57,19 +57,11 @@ class DistributedGroupSampler(Sampler):
 
 class BatchSampler(Sampler[List[int]]):
 
-    def __init__(self, sampler: Sampler[int], nums_frame: int, drop_last: bool) -> None:
+    def __init__(self, sampler: Sampler[int]) -> None:
         self.sampler = sampler
-        self.batch_size = nums_frame
-        self.drop_last = drop_last
 
     def __iter__(self):
-        batch = []
-        for ids in self.sampler:
-            batch.append(ids)
-            if len(batch) == self.batch_size:
-                yield self.sampler.dataset.flat_fn(batch)
-                batch = []
-        if len(batch) > 0 and not self.drop_last:
+        for batch in self.sampler:
             yield self.sampler.dataset.flat_fn(batch)
     def __len__(self):
         return len(self.sampler)

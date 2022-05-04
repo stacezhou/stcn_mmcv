@@ -23,7 +23,6 @@ if platform.system() != 'Windows':
 def build_dataloader(dataset,
                      samples_per_gpu,
                      workers_per_gpu,
-                     nums_frame,
                      num_gpus=1,
                      dist=True,
                      seed=None,
@@ -82,9 +81,7 @@ def build_dataloader(dataset,
         seed=seed, 
         **sampler_config,
         )
-    batch_sampler = BatchSampler(sampler=sampler,
-                    nums_frame=nums_frame,
-                    drop_last=False)
+    batch_sampler = BatchSampler(sampler=sampler)
 
     init_fn = partial(
         worker_init_fn, num_workers=num_workers, rank=rank,
@@ -101,7 +98,7 @@ def build_dataloader(dataset,
         dataset,
         num_workers=num_workers,
         batch_sampler=batch_sampler,
-        collate_fn=partial(collate, samples_per_gpu=samples_per_gpu * nums_frame),
+        collate_fn=partial(collate, samples_per_gpu=samples_per_gpu * dataset.nums_frame),
         pin_memory=False,
         worker_init_fn=init_fn,
         **kwargs)
