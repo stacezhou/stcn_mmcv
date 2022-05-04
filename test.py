@@ -19,7 +19,6 @@ def main():
             dataset,
             samples_per_gpu=1,
             workers_per_gpu=cfg.data.workers_per_gpu,
-            nums_frame=1,
             num_gpus=len(cfg.gpu_ids),
             dist=distributed)
 

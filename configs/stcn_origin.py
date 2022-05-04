@@ -26,13 +26,21 @@ data = dict(
 )
 
 model.update(dict(
-    max_per_frame = 3
+    max_per_frame = 3,
+    multi_scale_train = False,
 ))
 model['key_encoder']['backbone']['frozen_stages'] = 3
 model['loss_fn'].update(dict(
     start_warm=5000, 
     end_warm=10000, 
-    top_p=0.15
+    top_p=0.15,
+))
+
+model['memory'].update(dict(
+    top_k = 10,
+    mem_every = 5,
+    include_last = True,
+    thin_reading_scale = 8,
 ))
 
 optimizer = dict(type='Adam', lr=0.0005)
