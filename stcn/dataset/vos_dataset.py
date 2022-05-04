@@ -295,14 +295,20 @@ class ConcatDataset(_ConcatDataset):
         for ds in self.datasets:
             assert not ds.test_mode, 'concat dataset only support train mode'
         return False
+    @property
+    def nums_frame(self):
+        nums_f = [ds.nums_frame for ds in self.datasets]
+        assert len(set(nums_f)) == 1,'nums_frame of multi dataset should be same'
+        return nums_f[0]
 
     def flat_fn(self, batch_index):
         return [i for ids in batch_index for i in ids]
     def get_indices(self, samples_per_gpu):
         indices = []
-        for ds,cum in zip(self.datasets, self.cumulative_sizes):
+        cums = [0] + self.cummulative_sizes
+        for ds,cum in zip(self.datasets, cums[:-1]):
             indice = ds.get_indices(samples_per_gpu)
-            cum_indice = [[cum + idx for idx in idx_group] for idx_group in indice]
+            cum_indice = [[[cum + idx for idx in ids ] for ids in idx_group] for idx_group in indice]
             indices.extend(cum_indice)
         return indices
     
