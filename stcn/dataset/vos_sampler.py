@@ -42,7 +42,10 @@ class DistributedGroupSampler(Sampler):
 
         # subsample
         self.indices = self.dataset.get_indices(self.samples_per_gpu)
-        self.indices += self.indices[:self.num_samples]
+        if self.dataset.test_mode:
+            self.indices += [[-1]] * self.num_samples
+        else:
+            self.indices += self.indices[:self.num_samples]
         offset = self.num_samples * self.rank
         indices = self.indices[offset:offset + self.num_samples]
         assert len(indices) == self.num_samples

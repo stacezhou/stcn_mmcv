@@ -171,6 +171,8 @@ class VOSDataset(Dataset):
         return data
     
     def prepare_test_data(self, index):
+        if index < 0:
+            return {}
         v_id = index // self.M
         v = self.videos[v_id]
         f_id = index % self.M
