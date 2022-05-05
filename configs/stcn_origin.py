@@ -17,6 +17,8 @@ youtube_train.update(dict(
     nums_frame = 3,
 ))
 
+#=======================================================
+
 data.update(dict(
     samples_per_gpu = 4,
     train = [youtube_train] + [davis_train] * 5,
@@ -59,3 +61,6 @@ lr_config = dict(
     warmup_iters=1000,
     warmup_ratio=1.0 / 3,
     step=[10000])
+
+#==================================================
+del youtube_path,youtube_train,youtube_valid,davis_path,davis_train
