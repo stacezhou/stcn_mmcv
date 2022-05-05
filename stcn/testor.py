@@ -75,6 +75,7 @@ def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_co
 
     # collect results from all ranks
     results = collect_results_cpu(results, len(dataset), tmpdir)
+    model.train()
     return results
 
 
