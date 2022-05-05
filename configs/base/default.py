@@ -116,6 +116,7 @@ log_config = dict(
     interval=25,
     hooks=[
         dict(type='TextLoggerHook'),
+        dict(type='NNIHook'),
         dict(type='TensorboardLoggerHook'),
     ])
 
