@@ -35,10 +35,11 @@ def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_co
     palette = Image.open(data_loader.dataset.palette).getpalette()
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            mask = model(return_loss=False, **data)[0]
-            if mask is None:
+            if 'drop_flag' in data:
+                results.append(data['drop_flag'].item())
                 continue
 
+            mask = model(return_loss=False, **data)[0]
             img_metas = data['img_metas'].data[0][0]
             H_,W_ ,_ = img_metas['pad_shape']
             h,w,c =  img_metas['ori_shape']
@@ -95,9 +96,7 @@ def collect_results_cpu(result_part, size, tmpdir=None):
                 time.sleep(1)
             part_list.append(mmcv.load(part_file))
         # sort the results
-        ordered_results = []
-        for res in zip(*part_list):
-            ordered_results.extend(list(res))
+        ordered_results = [x for part in part_list for x in part]
         # the dataloader may pad some samples
         ordered_results = ordered_results[:size]
         # remove tmp dir

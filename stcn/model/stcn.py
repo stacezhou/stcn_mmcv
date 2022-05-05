@@ -86,8 +86,6 @@ class STCN(BaseModule):
         self.oi_groups = oi_groups
 
     def forward(self,img=None, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
-        if img is None:
-            return [None]
 
         pred_mask = [None for s in self.multi_scales]
         old_gt_mask = [None for s in self.multi_scales]
