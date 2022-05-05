@@ -23,3 +23,7 @@ ovis_path = dict(
     image_root = '/data/OVIS_img/train',
     mask_root = '/data/OVIS_anno/OVIS_anno',
 )
+static_path = dict(
+    image_root = '/data/static',
+    mask_root = '/data/static',
+)

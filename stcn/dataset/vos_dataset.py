@@ -22,12 +22,11 @@ class VOSStaticDataset(Dataset):
                     image_root, 
                     mask_root, 
                     pipeline=[], 
-                    test_mode = False,
+                    nums_frame = 4,
                     palette = None,
                     *k,**kw):
 
         self.palette = palette
-        self.test_mode = test_mode
         self.image_root = Path(image_root)
         self.mask_root = Path(mask_root)
         self.images = [str(x - self.image_root) for x in self.image_root.rglob('*.jpg')]
@@ -35,6 +34,7 @@ class VOSStaticDataset(Dataset):
         assert len(self.masks) == len(self.images)
 
         self.pipeline = Compose(pipeline)
+        self.nums_frame = nums_frame
         
         
     def __len__(self):
@@ -57,23 +57,16 @@ class VOSStaticDataset(Dataset):
     def get_indices(self, samplers_per_gpu):
         indices = [list(range(i,i+samplers_per_gpu)) 
             for i in range(0,len(self),samplers_per_gpu)]
+        indices = [[x]*self.nums_frame for x in indices]
         random.shuffle(indices)
         return indices
 
     def flat_fn(self, batch_index):
-        batch_index = batch_index[0:1] * len(batch_index)
         return [i for ids in batch_index for i in ids]
 
     def evaluate(self, results, logger, **kwargs):
-        J = [x['J'].mean() for x in results if x is not None]
-        F = [x['F'].mean() for x in results if x is not None]
-        import numpy as np
-        J = np.array(J).mean()
-        F = np.array(F).mean()
-        return {
-            'mIoU':J,
-            'F':F
-        }
+        return {'no_support_static_validate':1}
+
 @DATASETS.register_module()
 class VOSDataset(Dataset):
     def __init__(self, 
