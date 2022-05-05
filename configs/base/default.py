@@ -1,5 +1,9 @@
 img_norm_cfg = dict(
-    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+    # mean=[123.675, 116.28, 103.53], 
+    # std=[58.395, 57.12, 57.375], 
+    mean=[0.485, 0.456, 0.406],
+    std=[0.229, 0.224, 0.225],
+    to_rgb=True)
 meta_keys = ('flag', 'filename', 'ori_filename','labels',
      'ori_shape', 'img_shape', 'pad_shape', 'scale_factor',
       'flip', 'flip_direction', 'img_norm_cfg')
@@ -11,9 +15,9 @@ vos_train_pipeline= [
     dict(type='Albu', 
         transforms = [
             dict(type='RandomResizedCrop',
-                height=480,
-                width=896,
-                scale=(0.8, 1.0), 
+                height=384,
+                width=384,
+                scale=(0.36, 1.0), 
                 ratio=(0.7, 1.3),
                 p = 1,
                 ),
@@ -22,7 +26,7 @@ vos_train_pipeline= [
                 brightness_limit=[0.1, 0.3],
                 contrast_limit=[0.1, 0.3],
                 p=0.2),
-            dict(type='ChannelShuffle', p=0.1),
+            dict(type='ChannelShuffle', p=0.2),
             dict(type='OneOf',
                 transforms=[
                     # dict(type='Blur', blur_limit=3, p=1.0),

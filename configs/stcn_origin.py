@@ -11,7 +11,7 @@ davis_train.update(davis_path)
 
 for train in [youtube_train,davis_train]:
     train.update(dict(
-        max_skip = 5,
+        max_skip = 5, #[10, 15, 20, 25, 5] @ [0.1, 0.2, 0.3, 0.4, 0.8, 1.0]
         min_skip = 1,
         max_objs_per_frame = 2,
         max_objs_per_gpu= 8,
@@ -50,8 +50,9 @@ model['loss_fn'].update(dict(
     top_p=0.15
 ))
 
-optimizer = dict(type='Adam', lr=0.0005)
+optimizer = dict(type='Adam', lr=1e-5, weight_decay=1e-7)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+runner = dict(type='IterBasedRunner', max_iters=150000)
 
 lr_config = dict(
     policy='step',
@@ -59,7 +60,7 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=1000,
     warmup_ratio=1.0 / 3,
-    step=[10000])
+    step=[125000])
 
 annotation = """ 尽量和最初的 stcn 保持一致的配置版本 """
 #==================================================
