@@ -1,2 +1,0 @@
-runner.data_loader.dataset.random_skip = True
-runner.data_loader.dataset.max_skip = 3
