@@ -34,12 +34,17 @@ def generate_meta(image_root, mask_root):
         H,W,C = Image.open(str(Path(image_root) / image_frames[0])).__array__().shape
 
         labels_set = set()
+        bad_mask = []
         for mask in mask_frames:
-            labels_set = labels_set | read_labels(Path(mask_root) / mask)
+            try:
+                labels_set = labels_set | read_labels(Path(mask_root) / mask)
+            except:
+                bad_mask.append(mask)
+
         frame_and_mask = []
         for img in image_frames:
             mask = img[:-4]+'.png'
-            if mask in mask_frames:
+            if mask in mask_frames and mask not in bad_mask:
                 frame_and_mask.append([img,mask])
             else:
                 frame_and_mask.append([img,None])

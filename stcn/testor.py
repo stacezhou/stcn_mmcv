@@ -11,7 +11,7 @@ from mmcv.runner import get_dist_info
 from pathlib import Path
 from PIL import Image
 
-def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_collect=False, do_evaluate = False, runner = None):
+def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_collect=False, validate = False, runner = None):
     """Test model with multiple gpus.
     """
     model.eval()
@@ -55,7 +55,7 @@ def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_co
                 im.putpalette(palette)
                 im.save(out_path)
 
-            if do_evaluate is not None and 'gt_mask' in data:
+            if validate is not None and 'gt_mask' in data:
                 'compute score'
                 gt_mask = data['gt_mask'].data[0][0].squeeze(0)[:h,:w]
                 labels = img_metas['labels'][1:]
@@ -92,8 +92,9 @@ def collect_results_cpu(result_part, size, tmpdir=None):
         part_list = []
         for i in range(world_size):
             part_file = osp.join(tmpdir, f'part_{i}.pkl')
+            print()
             while not Path(part_file).exists():
-                print('waitting')
+                print('..',end='')
                 time.sleep(1)
             part_list.append(mmcv.load(part_file))
         # sort the results

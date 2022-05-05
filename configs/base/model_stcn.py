@@ -7,7 +7,12 @@ model = dict(
     type = 'STCN',
     init_cfg = dict(type='Kaiming', layer='Conv2d'),
     seg_background = False,
-    max_per_frame = 3,
+    max_objs_per_frame = 3,
+    multi_scale_train = False,
+    train_scales = [1],
+    multi_scale_test = False,
+    test_scales = [1, 1.3, 2],
+    align_corners = True,
     key_encoder = dict(
         type = 'KeyEncoder',
         backbone = dict(
@@ -50,10 +55,11 @@ model = dict(
     ),
     memory = dict(
         type= 'AffinityMemoryBank',
-        top_k = -1,
+        thin_reading_scale = 8,
+        top_k = 20,
         mem_every = 5,
         include_last = False,
-        thin_reading_scale = 8,
+        train_memory_strategy = False,
     ),
     loss_fn = dict(
         type = 'BootstrappedCE',

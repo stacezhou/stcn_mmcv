@@ -40,10 +40,10 @@ class STCN(BaseModule):
                 memory,
                 loss_fn,
                 seg_background = False,
-                max_per_frame = 3,
-                multi_scale = False,
+                max_objs_per_frame = 3,
+                multi_scale_test = False,
                 multi_scale_train = False,
-                scales = [1, 1.3, 1.5, 2],
+                test_scales = [1, 1.3, 1.5, 2],
                 train_scales = [1],
                 align_corners = True,
                 init_cfg=None):
@@ -56,16 +56,10 @@ class STCN(BaseModule):
         self.sentry = Parameter(torch.Tensor(0))
         self.targets = []
         self.oi_groups = []
-        self.max_per_frame = max_per_frame
+        self.max_objs_per_frame = max_objs_per_frame
         self.memory_module = memory
-
-        self.do_multi_scale = multi_scale
-        self.train_scales = train_scales
-        if not self.do_multi_scale:
-            self.test_sclaes = [1]
-        else:
-            self.test_sclaes = scales
-        self.multi_scale_train = multi_scale_train
+        self.test_sclaes = test_scales if multi_scale_test else [1]
+        self.train_scales = train_scales if multi_scale_train else [1]
         self.align_corners = align_corners
     
 
@@ -244,12 +238,26 @@ class STCN(BaseModule):
 
         if 'runner' in kw:
             runner = kw['runner']
+            # inject from config
+            if 'inject' in runner.meta and runner.iter in runner.meta['inject']:
+                command = runner.meta['inject'][runner.iter]
+                try:
+                    exec(command,
+                    {'data':runner.data_loader.dataset,
+                    'model':runner.model.module
+                    })
+                except:
+                    pass
+            # inject from file
             injection_command = Path(runner.work_dir) / f'inject@{runner.iter}'
             if injection_command.exists():
                 with open(injection_command, 'r') as fp:
                     command = fp.read()
                 try:
-                    exec(command,{'runner':runner})
+                    exec(command,
+                    {'data':runner.data_loader.dataset,
+                    'model':runner.model.module
+                    })
                 except:
                     pass
         return {
@@ -320,7 +328,7 @@ class STCN(BaseModule):
             object_labels  = gt_mask_TB[:,i].unique().tolist()
             if 0 in object_labels:
                 object_labels.remove(0)
-            while len(object_labels) > self.max_per_frame:
+            while len(object_labels) > self.max_objs_per_frame:
                 random.shuffle(object_labels)
                 l = object_labels.pop()
                 gt_mask_TB[:,i] = torch.where(gt_mask_TB[:,i] == l,torch.zeros_like(gt_mask_TB[:,i]),gt_mask_TB[:,i])

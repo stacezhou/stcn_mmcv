@@ -186,4 +186,6 @@ def get_config():
     meta['config'] = cfg.pretty_text
     meta['seed'] = seed
     meta['exp_name'] = osp.basename(args.config)
+    if cfg.get('inject',None) is not None:
+        meta['inject'] = cfg.inject
     return cfg, meta, timestamp, distributed

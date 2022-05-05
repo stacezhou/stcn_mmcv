@@ -1,6 +1,9 @@
-from configs.path import youtube
 img_norm_cfg = dict(
-    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+    # mean=[123.675, 116.28, 103.53], 
+    # std=[58.395, 57.12, 57.375], 
+    mean=[0.485, 0.456, 0.406],
+    std=[0.229, 0.224, 0.225],
+    to_rgb=True)
 meta_keys = ('flag', 'filename', 'ori_filename','labels',
      'ori_shape', 'img_shape', 'pad_shape', 'scale_factor',
       'flip', 'flip_direction', 'img_norm_cfg')
@@ -12,9 +15,9 @@ vos_train_pipeline= [
     dict(type='Albu', 
         transforms = [
             dict(type='RandomResizedCrop',
-                height=480,
-                width=896,
-                scale=(0.8, 1.0), 
+                height=384,
+                width=384,
+                scale=(0.36, 1.0), 
                 ratio=(0.7, 1.3),
                 p = 1,
                 ),
@@ -23,7 +26,7 @@ vos_train_pipeline= [
                 brightness_limit=[0.1, 0.3],
                 contrast_limit=[0.1, 0.3],
                 p=0.2),
-            dict(type='ChannelShuffle', p=0.1),
+            dict(type='ChannelShuffle', p=0.2),
             dict(type='OneOf',
                 transforms=[
                     # dict(type='Blur', blur_limit=3, p=1.0),
@@ -77,35 +80,78 @@ vos_test_pipeline_wo_mask = [
 
 ]
 
-youtube_train = dict(
-        type='VOSDataset',
-        pipeline = vos_train_pipeline,
-        shuffle_videos = True,
-        random_skip = True,
-        max_skip = 5,
-        min_skip = 1,
-        nums_frame = 4,
-        max_objs_per_gpu= 9,
-        max_per_frame = 4,
-        image_root = youtube['train']['image_root'],
-        mask_root = youtube['train']['mask_root'],
+train_data = dict(
+    type='VOSDataset',
+    pipeline = vos_train_pipeline,
+    palette = None,
+    test_mode = False,
+    nums_frame = 4,
+    max_objs_per_gpu= 8,
+    max_objs_per_frame = 3,
+    max_skip = 10,
+    min_skip = 1,
+    # image_root = 
+    # mask_root = 
 )
-youtube_valid = dict(
-        type='VOSDataset',
-        test_mode = True,
-        pipeline = vos_test_pipeline,
-        wo_mask_pipeline =vos_test_pipeline_wo_mask,
-        image_root = youtube['val']['image_root'],
-        mask_root = youtube['val']['mask_root'],
-        palette = youtube['val']['palette'],
+test_data = dict(
+    type='VOSDataset',
+    test_mode = True,
+    pipeline = vos_test_pipeline,
+    wo_mask_pipeline = vos_test_pipeline_wo_mask,
+    # image_root = 
+    # mask_root = 
+    # palette = 
 )
 
-youtube_debug_valid = dict(
-        type='VOSDataset',
-        test_mode = True,
-        pipeline = vos_test_pipeline,
-        wo_mask_pipeline = vos_test_pipeline_wo_mask,
-        image_root = youtube['mini_val']['image_root'],
-        mask_root = youtube['mini_val']['mask_root'],
-        palette = youtube['mini_val']['palette'],
+#============================================================
+from configs.base.model_stcn import model,custom_imports
+data = dict(
+    workers_per_gpu = 0,
+    samples_per_gpu = 4,
+    train = train_data,
+    val = test_data,
+    test = test_data,
 )
+log_config = dict(
+    interval=25,
+    hooks=[
+        dict(type='TextLoggerHook'),
+        dict(type='TensorboardLoggerHook'),
+    ])
+
+optimizer = dict(type='Adam', lr=0.0005)
+
+# optimizer_config = dict(grad_clip=None)
+optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+# learning policy
+lr_config = dict(
+    policy='step',
+    by_epoch = False,
+    warmup='linear',
+    warmup_iters=1000,
+    warmup_ratio=1.0 / 3,
+    step=[10000])
+
+runner = dict(type='IterBasedRunner', max_iters=15000)
+checkpoint_config = dict(interval=3000)
+
+fp16 = dict(loss_scale=512.)
+
+evaluation = dict(
+    start=100,
+    save_best='mIoU',
+    interval=200,
+    by_epoch=False)
+
+dist_params = dict(backend='nccl')
+log_level = 'INFO'
+load_from = None
+resume_from = None
+workflow = [('train', 1)]
+
+opencv_num_threads = 0
+mp_start_method = 'fork'
+find_unused_parameters = True
+
+#========================================================
+del img_norm_cfg,meta_keys,train_data,test_data,vos_test_pipeline,vos_test_pipeline_wo_mask,vos_train_pipeline
