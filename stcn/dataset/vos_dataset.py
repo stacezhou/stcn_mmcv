@@ -44,6 +44,8 @@ class VOSStaticDataset(Dataset):
 
 
     def __getitem__(self, index):
+        if index >= len(self):
+            index = index % len(self)
         image = self.images[index]
         mask = image[:-4] + '.png'
         data = {
