@@ -238,12 +238,26 @@ class STCN(BaseModule):
 
         if 'runner' in kw:
             runner = kw['runner']
+            # inject from config
+            if 'inject' in runner.meta and runner.iter in runner.meta['inject']:
+                command = runner.meta['inject'][runner.iter]
+                try:
+                    exec(command,
+                    {'data':runner.data_loader.dataset,
+                    'model':runner.model.module
+                    })
+                except:
+                    pass
+            # inject from file
             injection_command = Path(runner.work_dir) / f'inject@{runner.iter}'
             if injection_command.exists():
                 with open(injection_command, 'r') as fp:
                     command = fp.read()
                 try:
-                    exec(command,{'runner':runner})
+                    exec(command,
+                    {'data':runner.data_loader.dataset,
+                    'model':runner.model.module
+                    })
                 except:
                     pass
         return {
