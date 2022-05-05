@@ -82,12 +82,10 @@ class VOSDataset(Dataset):
             palette = None,
             wo_mask_pipeline = [], 
             test_mode=False,
-            shuffle_videos = False,
-            random_skip = False,
             nums_frame = 4,
             max_objs_per_gpu=8,
             max_skip = 10,
-            max_per_frame = 3,
+            max_objs_per_frame = 3,
             min_skip = 1,
             **kw):
 
@@ -121,10 +119,9 @@ class VOSDataset(Dataset):
 
         # random skip
         self.shuffle_videos = shuffle_videos
-        self.random_skip = random_skip
         self.min_skip = min_skip
         self.max_skip = max_skip
-        self.nums_objs = [min(x, max_per_frame) for x in self.nums_objs]
+        self.nums_objs = [min(x, max_objs_per_frame) for x in self.nums_objs]
 
         self.max_objs_per_gpu = max(max_objs_per_gpu,2)
 
@@ -255,9 +252,8 @@ class VOSDataset(Dataset):
         for vi,n in enumerate(self.nums_objs):
             n_vi_dict[n].append(vi)
 
-        if self.shuffle_videos:
-            for n,vis in n_vi_dict.items():
-                random.shuffle(vis)
+        for n,vis in n_vi_dict.items():
+            random.shuffle(vis)
 
         ns = sorted(list(n_vi_dict.keys()))
         target = self.max_objs_per_gpu
@@ -280,8 +276,7 @@ class VOSDataset(Dataset):
                     break
                 I_groups.append(i_group)
 
-        if self.shuffle_videos:
-            random.shuffle(I_groups)
+        random.shuffle(I_groups)
 
         indices = []
         for group in I_groups:
