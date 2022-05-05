@@ -7,6 +7,7 @@ import numpy as np
 from .utils import generate_meta
 import random
 from collections import defaultdict
+import pandas as pd
 
 def sub_path(a_path, b_path):
     b_parts = b_path.parts
@@ -196,8 +197,8 @@ class VOSDataset(Dataset):
         for v,result in zip(self.videos, results):
             J = [x['J'].mean() for x in result if not isinstance(x,int)]
             F = [x['F'].mean() for x in result if not isinstance(x,int)]
-            J = np.array(J).mean()
-            F = np.array(F).mean()
+            J = np.array(J).mean().tolist()
+            F = np.array(F).mean().tolist()
             JF = (J+F) / 2
             results_by_video[f'{v}']=JF
             all_JF += JF
@@ -207,13 +208,23 @@ class VOSDataset(Dataset):
         for i in range(self.M):
             J = [result[i]['J'].mean() for result in results if not isinstance(result[i],int)]
             F = [result[i]['F'].mean() for result in results if not isinstance(result[i],int)]
-            J = np.array(J).mean()
-            F = np.array(F).mean()
+            J = np.array(J).mean().tolist()
+            F = np.array(F).mean().tolist()
             JF = (J+F) / 2
-            results_by_video[f'frame/JF/{i}']=JF
+            results_by_video[f'{i}']=JF
         
-        logger.info(str(results_by_video))
-        logger.info(str(results_by_frame))
+        logger.info(
+            pd.DataFrame.from_dict(results_by_video,
+                                    orient='index',
+                                    columns=['JF'])
+            .sort_values('JF')
+            )
+        logger.info(
+            pd.DataFrame.from_dict(results_by_frame,
+                                    orient='index',
+                                    columns=['JF'])
+            .sort_index()
+            )
         return {
             'mIoU':all_JF,
         }

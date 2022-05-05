@@ -92,8 +92,9 @@ def collect_results_cpu(result_part, size, tmpdir=None):
         part_list = []
         for i in range(world_size):
             part_file = osp.join(tmpdir, f'part_{i}.pkl')
+            print()
             while not Path(part_file).exists():
-                print('waitting')
+                print('..',end='')
                 time.sleep(1)
             part_list.append(mmcv.load(part_file))
         # sort the results
