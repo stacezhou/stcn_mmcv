@@ -165,7 +165,7 @@ class STCN(BaseModule):
 
 
         if return_loss:
-            loss = []
+            loss = [torch.sum(self.sentry * 0)]
             for _old_gt_mask, _pred_logits in zip(old_gt_mask, pred_logits):
                 _loss = torch.sum(self.sentry * 0) 
                 iou = 0
@@ -242,8 +242,9 @@ class STCN(BaseModule):
             if 'inject' in runner.meta and runner.iter in runner.meta['inject']:
                 command = runner.meta['inject'][runner.iter]
                 try:
+                    # todo Epoch Runner support
                     exec(command,
-                    {'data':runner.data_loader.dataset,
+                    {'data':runner.data_loader._dataloader.dataset,
                     'model':runner.model.module
                     })
                 except:
@@ -255,7 +256,7 @@ class STCN(BaseModule):
                     command = fp.read()
                 try:
                     exec(command,
-                    {'data':runner.data_loader.dataset,
+                    {'data':runner.data_loader._dataloader.dataset,
                     'model':runner.model.module
                     })
                 except:

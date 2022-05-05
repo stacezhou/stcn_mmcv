@@ -34,6 +34,7 @@ class VOSStaticDataset(Dataset):
         self.masks = [str(x - self.mask_root) for x in self.mask_root.rglob('*.png')]
         assert len(self.masks) == len(self.images)
 
+        self.test_mode = False
         self.pipeline = Compose(pipeline)
         self.nums_frame = nums_frame
         
@@ -43,6 +44,8 @@ class VOSStaticDataset(Dataset):
 
 
     def __getitem__(self, index):
+        if index >= len(self):
+            index = index % len(self)
         image = self.images[index]
         mask = image[:-4] + '.png'
         data = {
@@ -211,7 +214,7 @@ class VOSDataset(Dataset):
             J = np.array(J).mean().tolist()
             F = np.array(F).mean().tolist()
             JF = (J+F) / 2
-            results_by_frame[f'{i}']=JF
+            results_by_frame[f'{i:02d}']=JF
 
         pd.set_option('display.max_rows', 200)       
         logger.info(
