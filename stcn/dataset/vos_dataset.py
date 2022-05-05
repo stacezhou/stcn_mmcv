@@ -211,8 +211,9 @@ class VOSDataset(Dataset):
             J = np.array(J).mean().tolist()
             F = np.array(F).mean().tolist()
             JF = (J+F) / 2
-            results_by_video[f'{i}']=JF
-        
+            results_by_frame[f'{i}']=JF
+
+        pd.set_option('display.max_rows', 200)       
         logger.info(
             pd.DataFrame.from_dict(results_by_video,
                                     orient='index',
