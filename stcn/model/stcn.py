@@ -44,6 +44,7 @@ class STCN(BaseModule):
                 multi_scale = False,
                 multi_scale_train = False,
                 scales = [1, 1.3, 1.5, 2],
+                train_scales = [1],
                 align_corners = True,
                 init_cfg=None):
         super().__init__(init_cfg)
@@ -56,14 +57,15 @@ class STCN(BaseModule):
         self.targets = []
         self.oi_groups = []
         self.max_per_frame = max_per_frame
+        self.memory_module = memory
 
         self.do_multi_scale = multi_scale
+        self.train_scales = train_scales
         if not self.do_multi_scale:
-            self.multi_scales = [1]
+            self.test_sclaes = [1]
         else:
-            self.multi_scales = scales
+            self.test_sclaes = scales
         self.multi_scale_train = multi_scale_train
-        self.memory = [VOSMODEL.build(memory) for s in self.multi_scales]
         self.align_corners = align_corners
     
 
@@ -78,14 +80,12 @@ class STCN(BaseModule):
         for oi,fi in enumerate(fi_list):
             oi_groups[fi].append(oi)
     
-        for memory in self.memory:
-            memory.update_targets(fi_list)
+        for i,s in enumerate(self.multi_scales):
+            self.memory[i].update_targets(fi_list)
         self.fi_list = fi_list
         self.oi_groups = oi_groups
 
     def forward(self,img=None, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
-        if img is None:
-            return [None]
 
         pred_mask = [None for s in self.multi_scales]
         old_gt_mask = [None for s in self.multi_scales]
@@ -301,10 +301,15 @@ class STCN(BaseModule):
 
 
     def train(self, mode=True):
+        if mode == True:
+            self.multi_scales = self.train_scales
+            self.memory = [VOSMODEL.build(self.memory_module) for s in self.multi_scales]
+        else:
+            self.multi_scales = self.test_sclaes
+            self.memory = [VOSMODEL.build(self.memory_module) for s in self.multi_scales]
+
         for memory in self.memory:
             memory.train(mode)
-        if mode == True and not self.multi_scale_train:
-            self.multi_scales = [1]
         super().train(mode)
 
     def eval(self):

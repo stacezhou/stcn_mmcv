@@ -10,19 +10,21 @@ class AffinityMemoryBank():
             top_k = 20,
             mem_every = 5,
             include_last = False,
+            train_use_test_mode = False,
             ) -> None:
         self.top_k = top_k
         self.test_mode = False
         self.mem_every = mem_every
         self.include_last = include_last
         self.thin_reading_scale = thin_reading_scale
+        self.train_use_test_mode = train_use_test_mode
         self.reset()
     
     def train(self, mode=True):
         if mode == True:
-            self.test_mode = False
+            self.test_mode = False 
         else:
-            self.test_mode = True
+            self.test_mode = True 
 
     def update_targets(self, fi_list):
         if self.is_init:
