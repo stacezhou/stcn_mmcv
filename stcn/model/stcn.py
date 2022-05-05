@@ -165,7 +165,7 @@ class STCN(BaseModule):
 
 
         if return_loss:
-            loss = []
+            loss = [torch.sum(self.sentry * 0)]
             for _old_gt_mask, _pred_logits in zip(old_gt_mask, pred_logits):
                 _loss = torch.sum(self.sentry * 0) 
                 iou = 0
