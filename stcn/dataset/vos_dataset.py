@@ -118,7 +118,6 @@ class VOSDataset(Dataset):
         self.nums_objs = [self.data_infos[v]['nums_obj'] for v in self.videos]
 
         # random skip
-        self.shuffle_videos = shuffle_videos
         self.min_skip = min_skip
         self.max_skip = max_skip
         self.nums_objs = [min(x, max_objs_per_frame) for x in self.nums_objs]

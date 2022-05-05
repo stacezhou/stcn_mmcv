@@ -100,7 +100,7 @@ test_data = dict(
 )
 
 #============================================================
-from configs.base.model_stcn import model
+from configs.base.model_stcn import model,custom_imports
 data = dict(
     workers_per_gpu = 0,
     samples_per_gpu = 4,

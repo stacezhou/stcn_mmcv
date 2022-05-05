@@ -9,16 +9,16 @@ youtube_train.update(youtube_path['train'])
 youtube_valid.update(youtube_path['val'])
 davis_train.update(davis_path)
 
-youtube_train.update(dict(
-    max_skip = 5,
-    min_skip = 1,
-    max_objs_per_frame = 2,
-    max_objs_per_gpu= 8,
-    nums_frame = 3,
-))
+for train in [youtube_train,davis_train]:
+    train.update(dict(
+        max_skip = 5,
+        min_skip = 1,
+        max_objs_per_frame = 2,
+        max_objs_per_gpu= 8,
+        nums_frame = 3,
+    ))
 
 #=======================================================
-
 data.update(dict(
     samples_per_gpu = 4,
     train = [youtube_train] + [davis_train] * 5,
@@ -33,7 +33,6 @@ model.update(dict(
     train_scales = [1],
     multi_scale_test = False,
     test_scales = [1, 1.3, 2],
-
 ))
 
 model['memory'].update(dict(
@@ -62,5 +61,6 @@ lr_config = dict(
     warmup_ratio=1.0 / 3,
     step=[10000])
 
+annotation = """ 尽量和最初的 stcn 保持一致的配置版本 """
 #==================================================
 del youtube_path,youtube_train,youtube_valid,davis_path,davis_train
