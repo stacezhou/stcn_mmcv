@@ -342,17 +342,18 @@ class ConcatDataset(_ConcatDataset):
         return indices
     
     def evaluate(self, results, logger=None, **kwargs):
-        results = [x for x in results if x is not None]
-        J = [x['J'].mean() for x in results if x is not None]
-        F = [x['F'].mean() for x in results if x is not None]
-        import numpy as np
-        J = np.array(J).mean()
-        F = np.array(F).mean()
+        return {'not_support_concat_test':1}
+        # results = [x for x in results if x is not None]
+        # J = [x['J'].mean() for x in results if x is not None]
+        # F = [x['F'].mean() for x in results if x is not None]
+        # import numpy as np
+        # J = np.array(J).mean()
+        # F = np.array(F).mean()
 
-        return {
-            'mIoU':J,
-            'F':F
-        }
+        # return {
+        #     'mIoU':J,
+        #     'F':F
+        # }
 
 def compact_to(target, options, nums, top=True):
     'target: 10, options: 5,4,3,2, nums: 3 --> [5,3,2]'

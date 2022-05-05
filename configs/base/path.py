@@ -5,7 +5,8 @@ youtube_path = dict(
     ),
     val = dict(
         image_root = '/data/YouTube/valid/JPEGImages',
-        mask_root = '/data/YouTube/valid/Annotations',
+        mask_root = '/data/YouTube/valid/valid_Annotations',
+        # mask_root = '/data/YouTube/valid/Annotations',
         palette = '/data/YouTube/valid/Annotations/0a49f5265b/00000.png',
     ),
     mini_val = dict(
