@@ -19,6 +19,7 @@ for train in [youtube_train,davis_train]:
         max_objs_per_gpu= 8,
         nums_frame = 3,
     ))
+del train
 total_iters = 150000
 increase_skip = [int(total_iters*f) for f in [0.1,0.2,0.3,0.4,0.8]]
 max_skips = [10,15,20,25,5]
