@@ -43,7 +43,7 @@ class DistributedGroupSampler(Sampler):
         # subsample
         self.indices = self.dataset.get_indices(self.samples_per_gpu)
         if self.dataset.test_mode:
-            self.indices += [[-1]] * self.num_samples
+            self.indices += [[[-1]] for x in range(self.num_samples)]
         else:
             self.indices += self.indices[:self.num_samples]
         offset = self.num_samples * self.rank

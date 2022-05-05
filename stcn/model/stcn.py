@@ -68,9 +68,7 @@ class STCN(BaseModule):
         self.fi_list = fi_list
         self.oi_groups = oi_groups
 
-    def forward(self,img=None, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
-        if img is None:
-            return [None]
+    def forward(self,img, gt_mask=None, img_metas=None, return_loss=False,*k,**kw):
         pred_mask = None
         new_gt_mask = None
         #! encode key
