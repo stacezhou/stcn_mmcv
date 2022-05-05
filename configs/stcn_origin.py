@@ -6,7 +6,7 @@ davis_train = data['train'].copy()
 youtube_valid = data['test'].copy()
 
 youtube_train.update(youtube_path['train'])
-youtube_valid.update(youtube_path['val'])
+youtube_valid.update(youtube_path['mini_val'])
 davis_train.update(davis_path)
 
 for train in [youtube_train,davis_train]:
