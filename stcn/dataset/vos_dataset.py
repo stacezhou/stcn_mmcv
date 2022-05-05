@@ -3,6 +3,7 @@ from pathlib import Path
 from mmdet.datasets.pipelines import Compose
 from mmdet.datasets import DATASETS
 import mmcv
+import numpy as np
 from .utils import generate_meta
 import random
 from collections import defaultdict
@@ -196,49 +197,32 @@ class VOSDataset(Dataset):
         return data
 
     def evaluate(self, results, logger=None, **kwargs):
-        import numpy as np
         results = [results[i*self.M:(i+1)*self.M] for i in range(len(self.videos))]
         results_by_video = dict()
+        all_JF = 0
         for v,result in zip(self.videos, results):
             J = [x['J'].mean() for x in result if not isinstance(x,int)]
             F = [x['F'].mean() for x in result if not isinstance(x,int)]
             J = np.array(J).mean()
             F = np.array(F).mean()
             JF = (J+F) / 2
-            results_by_video[f'video/JF/{v}']=JF
+            results_by_video[f'{v}']=JF
+            all_JF += JF
+        all_JF /= len(self.videos)
 
-        all_JF = 0
         results_by_frame = dict()
         for i in range(self.M):
             J = [result[i]['J'].mean() for result in results if not isinstance(result[i],int)]
             F = [result[i]['F'].mean() for result in results if not isinstance(result[i],int)]
             J = np.array(J).mean()
             F = np.array(F).mean()
-            results_by_frame[f'frame/J/{i}']=J
-            results_by_frame[f'frame/F/{i}']=F
             JF = (J+F) / 2
             results_by_video[f'frame/JF/{i}']=JF
-            all_JF += JF
-        all_JF /= self.M
         
-        results_by_object = dict()
-        for v,result in zip(self.videos, results):
-            if isinstance(result[0],int):
-                continue
-            num_obj = result[0]['J'].shape[0]
-            J = [x['J'] for x in result if not isinstance(x,int)]
-            F = [x['F'] for x in result if not isinstance(x,int)]
-            J = np.array(J).mean(axis=1)
-            F = np.array(F).mean(axis=1)
-            for i in range(num_obj):
-                JF = (J[i]+F[i]) / 2
-                results_by_object[f'object/JF/{v}_{i}']=JF
-        
+        logger.info(str(results_by_video))
+        logger.info(str(results_by_frame))
         return {
             'mIoU':all_JF,
-            **results_by_video,
-            **results_by_frame,
-            **results_by_object
         }
 
     
@@ -343,17 +327,6 @@ class ConcatDataset(_ConcatDataset):
     
     def evaluate(self, results, logger=None, **kwargs):
         return {'not_support_concat_test':1}
-        # results = [x for x in results if x is not None]
-        # J = [x['J'].mean() for x in results if x is not None]
-        # F = [x['F'].mean() for x in results if x is not None]
-        # import numpy as np
-        # J = np.array(J).mean()
-        # F = np.array(F).mean()
-
-        # return {
-        #     'mIoU':J,
-        #     'F':F
-        # }
 
 def compact_to(target, options, nums, top=True):
     'target: 10, options: 5,4,3,2, nums: 3 --> [5,3,2]'
