@@ -113,7 +113,7 @@ data = dict(
     test = test_data,
 )
 log_config = dict(
-    interval=25,
+    interval=51,
     hooks=[
         dict(type='TextLoggerHook'),
         dict(type='TensorboardLoggerHook'),
@@ -140,7 +140,7 @@ fp16 = dict(loss_scale=512.)
 evaluation = dict(
     start=100,
     save_best='mIoU',
-    interval=200,
+    interval=501,
     by_epoch=False)
 
 dist_params = dict(backend='nccl')

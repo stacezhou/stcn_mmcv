@@ -35,7 +35,7 @@ custom_imports = dict(
     imports=['stcn.loss.bce', 'stcn.model'], allow_failed_imports=False)
 checkpoint_config = dict(interval=2500)
 log_config = dict(
-    interval=25,
+    interval=51,
     hooks=[dict(type='TextLoggerHook'),
            dict(type='TensorboardLoggerHook')])
 dist_params = dict(backend='nccl')
@@ -422,7 +422,7 @@ lr_config = dict(
     step=[8000])
 runner = dict(type='IterBasedRunner', max_iters=15000)
 fp16 = dict(loss_scale=512.0)
-evaluation = dict(start=100, save_best='mIoU', interval=100, by_epoch=False)
+evaluation = dict(start=100, save_best='mIoU', interval=501, by_epoch=False)
 validate = True
 auto_resume = False
 gpu_ids = range(0, 2)
