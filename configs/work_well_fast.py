@@ -419,8 +419,11 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=1000,
     warmup_ratio=0.3333333333333333,
-    step=[8000])
-runner = dict(type='IterBasedRunner', max_iters=15000)
+    step=[8000,20000])
+inject = {
+    15010:'data.max_skip=5'
+}
+runner = dict(type='IterBasedRunner', max_iters=30000)
 fp16 = dict(loss_scale=512.0)
 evaluation = dict(start=100, save_best='mIoU', interval=501, by_epoch=False)
 validate = True
