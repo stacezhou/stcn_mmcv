@@ -7,7 +7,7 @@ class NNIHook(LoggerHook):
     def __init__(self,
                  metric_full_name = 'mIoU',
                  final_iter = 30000,
-                 interval= 100,
+                 interval= 1,
                  ignore_last=True,
                  reset_flag=False,
                  by_epoch=False):
@@ -23,6 +23,6 @@ class NNIHook(LoggerHook):
             if tag == 'val/' + self.metric_full_name:
                 metric = val
                 """@nni.report_intermediate_result(metric)"""
-                if runner._epoch == self.final_epoch:
+                if runner.iter > self.final_iter or runner.iter > runner.max_iters - 1000:
                     metric = val
                     """@nni.report_final_result(metric)"""
