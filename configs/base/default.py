@@ -113,7 +113,7 @@ data = dict(
     test = test_data,
 )
 log_config = dict(
-    interval=25,
+    interval=51,
     hooks=[
         dict(type='TextLoggerHook'),
         dict(type='NNIHook'),
@@ -141,18 +141,18 @@ fp16 = dict(loss_scale=512.)
 evaluation = dict(
     start=100,
     save_best='mIoU',
-    interval=200,
+    interval=501,
     by_epoch=False)
 
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 load_from = None
 resume_from = None
+auto_resume = True
 workflow = [('train', 1)]
 
 opencv_num_threads = 0
 mp_start_method = 'fork'
 find_unused_parameters = True
-
 #========================================================
 del img_norm_cfg,meta_keys,train_data,test_data,vos_test_pipeline,vos_test_pipeline_wo_mask,vos_train_pipeline
