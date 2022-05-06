@@ -147,11 +147,11 @@ dist_params = dict(backend='nccl')
 log_level = 'INFO'
 load_from = None
 resume_from = None
+auto_resume = True
 workflow = [('train', 1)]
 
 opencv_num_threads = 0
 mp_start_method = 'fork'
 find_unused_parameters = True
-
 #========================================================
 del img_norm_cfg,meta_keys,train_data,test_data,vos_test_pipeline,vos_test_pipeline_wo_mask,vos_train_pipeline
