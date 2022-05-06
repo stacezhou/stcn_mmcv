@@ -35,7 +35,7 @@ def main():
         out_dir = None
     results = multi_gpu_test(model, data_loader, out_dir=out_dir, validate=cfg.validate)
     
-    if cfg.validate:
+    if cfg.validate and results is not None:
         mmcv.dump(results,Path(cfg.work_dir) / 'test_results_details.pkl')
         eval_res = dataset.evaluate(results)
         print(eval_res)
