@@ -95,6 +95,11 @@ class VOSDataset(Dataset):
         self.image_root = image_root
         self.mask_root = mask_root
 
+        self.test_mode = test_mode
+        if test_mode:
+            min_skip = 1
+            max_skip = 1
+            nums_frame = 1
         meta_stcn = Path(image_root) / 'meta_stcn.json'
         if meta_stcn.exists():
             self.data_infos = mmcv.load(str(meta_stcn))
@@ -124,7 +129,6 @@ class VOSDataset(Dataset):
 
         # for output mask
         self.palette = palette
-        self.test_mode = test_mode
         
         
     def __len__(self):
@@ -217,18 +221,17 @@ class VOSDataset(Dataset):
             results_by_frame[f'{i:02d}']=JF
 
         pd.set_option('display.max_rows', 200)       
-        logger.info(
-            pd.DataFrame.from_dict(results_by_video,
-                                    orient='index',
-                                    columns=['JF'])
-            .sort_values('JF')
-            )
-        logger.info(
-            pd.DataFrame.from_dict(results_by_frame,
-                                    orient='index',
-                                    columns=['JF'])
-            .sort_index()
-            )
+        video_result =     pd.DataFrame.from_dict(results_by_video, orient='index', columns=['JF']) .sort_values('JF')
+        frame_result =     pd.DataFrame.from_dict(results_by_frame, orient='index', columns=['JF']) .sort_index()
+        if logger is not None:
+            logger.info(video_result)
+            logger.info(frame_result)
+            logger.info(all_JF)
+        else:
+            print(video_result)
+            print(frame_result)
+            print(all_JF)
+            video_result.to_csv('latest_result_video.json')
         return {
             'mIoU':all_JF,
         }

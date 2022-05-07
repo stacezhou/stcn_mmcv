@@ -63,7 +63,7 @@ def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_co
                 JF = metric_JF(pred, gt)
                 result = [JF]
             else:
-                result = [None]
+                result = [-2]
 
 
         results.extend(result)
@@ -79,7 +79,7 @@ def multi_gpu_test(model, data_loader, tmpdir='/tmp/stcn', out_dir = None,gpu_co
     return results
 
 
-def collect_results_cpu(result_part, size, tmpdir=None):
+def collect_results_cpu(result_part, size, tmpdir='/tmp'):
     rank, world_size = get_dist_info()
     mmcv.mkdir_or_exist(tmpdir)
     # dump the part result to the dir

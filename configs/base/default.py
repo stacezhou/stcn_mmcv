@@ -1,8 +1,6 @@
 img_norm_cfg = dict(
-    # mean=[123.675, 116.28, 103.53], 
-    # std=[58.395, 57.12, 57.375], 
-    mean=[0.485, 0.456, 0.406],
-    std=[0.229, 0.224, 0.225],
+    mean=[123.675, 116.28, 103.53], 
+    std=[58.395, 57.12, 57.375], 
     to_rgb=True)
 meta_keys = ('flag', 'filename', 'ori_filename','labels',
      'ori_shape', 'img_shape', 'pad_shape', 'scale_factor',
@@ -14,6 +12,11 @@ vos_train_pipeline= [
     dict(type='EnAlbu'),
     dict(type='Albu', 
         transforms = [
+            dict(type='Resize',
+                height=896, 
+                width=480, 
+                p=1, 
+                interpolation=0),
             dict(type='RandomResizedCrop',
                 height=384,
                 width=384,
@@ -116,6 +119,7 @@ log_config = dict(
     interval=51,
     hooks=[
         dict(type='TextLoggerHook'),
+        dict(type='NNIHook'),
         dict(type='TensorboardLoggerHook'),
     ])
 
@@ -133,7 +137,7 @@ lr_config = dict(
     step=[10000])
 
 runner = dict(type='IterBasedRunner', max_iters=15000)
-checkpoint_config = dict(interval=3000)
+checkpoint_config = dict(interval=5000)
 
 fp16 = dict(loss_scale=512.)
 

@@ -1,7 +1,7 @@
 K_dim = 64
 V_dim = 512
 custom_imports = dict(
-    imports=['stcn.loss.bce','stcn.model'],
+    imports=['stcn.loss.bce','stcn.model','stcn.nni_hook'],
     allow_failed_imports=False)
 model = dict(
     type = 'STCN',
