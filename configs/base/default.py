@@ -137,7 +137,7 @@ lr_config = dict(
     step=[10000])
 
 runner = dict(type='IterBasedRunner', max_iters=15000)
-checkpoint_config = dict(interval=3000)
+checkpoint_config = dict(interval=5000)
 
 fp16 = dict(loss_scale=512.)
 
