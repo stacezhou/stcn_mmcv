@@ -295,7 +295,9 @@ class VOSDataset(Dataset):
                     for i in range(self.nums_frame - 1)]
             trial_times += 1
         if trial_times == 10:
-            skips = [self.min_skip for i in range(self.nums_frame - 1)]
+            skips = [self.min_skip for i in range(self.nums_frame - 2)]
+            skips += [random.randint(0,min(self.max_skip, max_fid-sum(skips)))]
+        random.shuffle(skips)
         start = random.randint(0, max_fid - sum(skips))
         offsets = [0] 
         for skip in skips:
