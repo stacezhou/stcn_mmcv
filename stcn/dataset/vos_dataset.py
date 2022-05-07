@@ -232,8 +232,16 @@ class VOSDataset(Dataset):
             print(frame_result)
             print(all_JF)
             video_result.to_csv('latest_result_video.json')
+        res_eval = dict()
+        if Path('evaluate_meta.json').exists():
+            meta = mmcv.load('evaluate_meta.json')
+            index_set = set(video_result.index)
+            for tag,v_list in meta.items():
+                index = list(set(v_list) & index_set)
+                res_eval[tag] = video_result.loc[index].mean().item()
         return {
             'mIoU':all_JF,
+            **res_eval
         }
 
     
