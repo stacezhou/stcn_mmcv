@@ -409,17 +409,11 @@ backbone=dict(
 )
 
 class PA_module(BaseModule):
-    def __init__(self, backbone=backbone,require_grad=False,load_from = None,init_cfg=None):
+    def __init__(self, backbone=backbone,require_grad=False,init_cfg=None):
         super().__init__(init_cfg)
         self.backbone = build_backbone(backbone)
         self.classifier = PairwiseAffinityHeadUperNet(channels=1,return_feat=True)
         self.require_grad = require_grad
-        self.load_from = load_from
-
-        if not self.require_grad:
-            assert self.load_from is not None
-            from mmcv.runner import load_checkpoint
-            load_checkpoint(self, self.load_from)
 
     def forward(self,img):
         if self.require_grad:
