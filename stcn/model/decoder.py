@@ -45,7 +45,7 @@ class MaskDecoder(BaseModule):
         if self.with_pa:
             img = feats['img']
             pa = self.pa(img)
-            x = torch.cat([pa,x],dim=1)
+            x = torch.cat([pa[fii],x],dim=1)
 
         x = self.pred(F.relu(x))
         

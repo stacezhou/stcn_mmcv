@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from mmdet.models import build_backbone
+from mmcv.runner import BaseModule,Sequential
 
 EPS = 1e-5
 
@@ -225,7 +226,7 @@ def instance_mask2affinity(
     return torch.from_numpy(affinity), torch.from_numpy(bg_filter)
 
 
-class PairwiseAffinityHead(nn.Sequential):
+class PairwiseAffinityHead(Sequential):
     """
     Pairwise affinity predictor
     """
@@ -252,7 +253,7 @@ class PairwiseAffinityHead(nn.Sequential):
         super(PairwiseAffinityHead, self).__init__(*layers)
 
 
-class PairwiseAffinityHeadUperNet(nn.Module):
+class PairwiseAffinityHeadUperNet(BaseModule):
     """
     UperNet version of predictor head; leverage FPN
     Reference: https://github.com/CSAILVision/unifiedparsing
@@ -407,16 +408,18 @@ backbone=dict(
     strides=(1, 2, 2, 2),
 )
 
-class PA_module(nn.Module):
-    def __init__(self, backbone=backbone,require_grad=False,return_feat=True):
-        super().__init__()
+class PA_module(BaseModule):
+    def __init__(self, backbone=backbone,require_grad=False,load_from = None,init_cfg=None):
+        super().__init__(init_cfg)
         self.backbone = build_backbone(backbone)
         self.classifier = PairwiseAffinityHeadUperNet(channels=1,return_feat=True)
         self.require_grad = require_grad
+        self.load_from = load_from
 
-    def init_weights(self, pretrained="torchvision://resnet50"):
-        super().init_weights(pretrained)
-        self.backbone.init_weights(pretrained)
+        if not self.require_grad:
+            assert self.load_from is not None
+            from mmcv.runner import load_checkpoint
+            load_checkpoint(self, self.load_from)
 
     def forward(self,img):
         if self.require_grad:
