@@ -58,7 +58,7 @@ model = dict(
         thin_reading_scale = 8,
         top_k = 20,
         mem_every = 5,
-        include_last = False,
+        include_last = True,
         train_memory_strategy = False,
     ),
     loss_fn = dict(
