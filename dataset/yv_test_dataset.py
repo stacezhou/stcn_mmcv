@@ -87,7 +87,15 @@ class YouTubeVOSTestDataset(Dataset):
         # this is because YouTubeVOS's labels are sometimes not continuous
         # while we want continuous ones (for one-hot)
         # so we need to maintain a backward mapping table
-        labels = np.unique(masks).astype(np.uint8)
+        # labels = np.unique(masks).astype(np.uint8)
+        labels = []
+        for mask in masks:
+            this_labels = np.unique(mask).tolist()
+            for obj_idx in this_labels:
+                if obj_idx not in labels:
+                    labels.append(obj_idx)
+        labels = np.array(labels)
+
         labels = labels[labels!=0]
         info['label_convert'] = {}
         info['label_backward'] = {}
