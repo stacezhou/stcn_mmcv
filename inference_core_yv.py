@@ -9,10 +9,13 @@ from util.tensor_util import pad_divide_by
 
 class InferenceCore:
     def __init__(self, prop_net:STCN, images, num_objects, top_k=20, 
-                    mem_every=5, include_last=False, req_frames=None):
+                    mem_every=5, include_last=False, req_frames=None,info=None):
         self.prop_net = prop_net
         self.mem_every = mem_every
         self.include_last = include_last
+        seq_name = info['name'][0]
+        self.seq_name = seq_name
+        self.frames = info['frames']
 
         # We HAVE to get the output for these frames
         # None if all frames are required
@@ -84,6 +87,20 @@ class InferenceCore:
             for oi in self.enabled_obj], 0)
 
             out_mask = aggregate(out_mask, keep_bg=True)
+            ###########
+            def ensemble(send, pipe, meta):
+                import mmcv
+                device = send.device
+                mmcv.dump({ meta:send.cpu().numpy()}, pipe)
+                get = mmcv.load(pipe)
+                get = torch.from_numpy(get).to(device)
+                return get
+            from pathlib import Path
+            if Path('/tmp/stcn.pkl').exists():
+                imgname = self.frames[ti][0]
+                out_mask = ensemble(out_mask, '/tmp/stcn.pkl', f'{self.seq_name}/{imgname}')
+            ###########
+
             self.prob[0,ti] = out_mask[0]
             for i, oi in enumerate(self.enabled_obj):
                 self.prob[oi,ti] = out_mask[i+1]

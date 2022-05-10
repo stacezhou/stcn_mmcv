@@ -117,7 +117,7 @@ for data in progressbar(test_loader, max_value=len(test_loader), redirect_stdout
 
         processor = InferenceCore(prop_model, rgb, num_objects=num_objects, top_k=top_k, 
                                     mem_every=args.mem_every, include_last=args.include_last, 
-                                    req_frames=req_frames)
+                                    req_frames=req_frames, info=info)
         # min_idx tells us the starting point of propagation
         # Propagating before there are labels is not useful
         min_idx = 99999
