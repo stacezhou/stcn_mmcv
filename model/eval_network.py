@@ -36,11 +36,8 @@ class STCN(nn.Module):
         frame = frame.view(1, 3, h, w).repeat(k, 1, 1, 1)
         # Compute the "others" mask
         if k != 1:
-            others = torch.cat([
-                torch.sum(
-                    masks[[j for j in range(k) if i!=j]]
-                , dim=0, keepdim=True)
-            for i in range(k)], 0)
+            all_masks = torch.sum(masks,dim=0)
+            others = all_masks - masks
         else:
             others = torch.zeros_like(masks)
 

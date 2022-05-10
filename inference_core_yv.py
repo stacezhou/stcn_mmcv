@@ -52,7 +52,7 @@ class InferenceCore:
         self.mem_banks = dict()
 
     def encode_key(self, idx):
-        result = self.prop_net.encode_key(self.images[:,idx].cuda())
+        result = self.prop_net.encode_key(self.images[:,idx])
         return result
 
     def do_pass(self, key_k, key_v, idx, end_idx):
@@ -107,7 +107,7 @@ class InferenceCore:
 
             if ti != end:
                 if self.include_last or is_mem_frame:
-                    prev_value = self.prop_net.encode_value(self.images[:,ti].cuda(), qf16, out_mask[1:])
+                    prev_value = self.prop_net.encode_value(self.images[:,ti], qf16, out_mask[1:])
                     prev_key = k16.unsqueeze(2)
                     for i, oi in enumerate(self.enabled_obj):
                         self.mem_banks[oi].add_memory(prev_key, prev_value[i:i+1], is_temp=not is_mem_frame)
@@ -119,7 +119,7 @@ class InferenceCore:
 
     def interact(self, mask, frame_idx, end_idx, obj_idx):
         # In youtube mode, we interact with a subset of object id at a time
-        mask, _ = pad_divide_by(mask.cuda(), 16)
+        mask, _ = pad_divide_by(mask, 16)
 
         # update objects that have been labeled
         self.enabled_obj.extend(obj_idx)
@@ -133,7 +133,7 @@ class InferenceCore:
 
         # KV pair for the interacting frame
         key_k, _, qf16, _, _ = self.encode_key(frame_idx)
-        key_v = self.prop_net.encode_value(self.images[:,frame_idx].cuda(), qf16, self.prob[self.enabled_obj,frame_idx].cuda())
+        key_v = self.prop_net.encode_value(self.images[:,frame_idx], qf16, self.prob[self.enabled_obj,frame_idx])
         key_k = key_k.unsqueeze(2)
 
         # Propagate

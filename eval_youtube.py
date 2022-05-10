@@ -115,7 +115,7 @@ for data in progressbar(test_loader, max_value=len(test_loader), redirect_stdout
         # Frames with labels, but they are not exhaustively labeled
         frames_with_gt = sorted(list(gt_obj.keys()))
 
-        processor = InferenceCore(prop_model, rgb, num_objects=num_objects, top_k=top_k, 
+        processor = InferenceCore(prop_model, rgb.cuda(), num_objects=num_objects, top_k=top_k, 
                                     mem_every=args.mem_every, include_last=args.include_last, 
                                     req_frames=req_frames, info=info)
         # min_idx tells us the starting point of propagation
