@@ -25,8 +25,9 @@ increase_skip = [int(total_iters*f) for f in [0.1,0.2,0.3,0.4,0.8]]
 max_skips = [10,15,20,25,5]
 
 #=======================================================
+
 inject = {
-    it : f'data.max_skip={skip}'
+    it : f"for ds in data.datasets: ds.max_skip = {skip}"
     for it,skip in zip(increase_skip,max_skips)
 }
 
