@@ -52,7 +52,7 @@ def generate_meta(image_root, mask_root):
             'img_height' : H,
             'img_width' : W,
             'nums_frame' : len(frame_and_mask),
-            'labels' : labels_set,
+            'labels' : sorted(list(labels_set)),
             'nums_obj' : len(labels_set) - 1,
             'frame_and_mask':frame_and_mask
         }

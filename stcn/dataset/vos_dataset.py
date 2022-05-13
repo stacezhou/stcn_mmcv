@@ -100,7 +100,7 @@ class VOSDataset(Dataset):
             min_skip = 1
             max_skip = 1
             nums_frame = 1
-        meta_stcn = Path(image_root) / 'meta_stcn.json'
+        meta_stcn = Path(mask_root) / 'meta_stcn.json'
         if meta_stcn.exists():
             self.data_infos = mmcv.load(str(meta_stcn))
         else:
